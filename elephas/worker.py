@@ -5,7 +5,7 @@ from keras.models import model_from_yaml
 from keras.optimizers import get as get_optimizer
 
 from .utils import subtract_params
-from .parameter import SocketClient, HttpClient
+from .parameter import BaseParameterClient
 
 
 class SparkWorker(object):
@@ -56,14 +56,7 @@ class AsynchronousSparkWorker(object):
     def __init__(self, yaml, parameters, parameter_server_mode, train_config, frequency,
                  master_optimizer, master_loss, master_metrics, custom_objects):
 
-        if parameter_server_mode == 'http':
-            self.client = HttpClient()
-        elif parameter_server_mode == 'socket':
-            self.client = SocketClient()
-        else:
-            raise ValueError("Parameter server mode has to be either `http` or `socket`, "
-                             "got {}".format(parameter_server_mode))
-
+        self.client = BaseParameterClient.get_client(parameter_server_mode)
         self.train_config = train_config
         self.frequency = frequency
         self.master_optimizer = master_optimizer

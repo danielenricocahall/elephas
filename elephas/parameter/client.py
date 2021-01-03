@@ -22,7 +22,7 @@ class BaseParameterClient(abc.ABC):
         raise NotImplementedError
 
     @classmethod
-    def get_client(cls, client_type, port):
+    def get_client(cls, client_type, port=4000):
         try:
             return next(cl for cl in cls.__subclasses__() if cl.client_type == client_type)(port)
         except StopIteration:
@@ -52,7 +52,6 @@ class HttpClient(BaseParameterClient):
     client_type = 'http'
 
     def __init__(self, port=4000):
-
         self.master_url = determine_master(port=port)
         self.headers = {'Content-Type': 'application/elephas'}
 
