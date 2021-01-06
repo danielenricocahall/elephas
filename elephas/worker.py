@@ -1,11 +1,33 @@
 import numpy as np
 from itertools import tee
-from keras.utils.generic_utils import slice_arrays
-from keras.models import model_from_yaml
-from keras.optimizers import get as get_optimizer
+from tensorflow.python.keras.utils.generic_utils import slice_arrays
+from tensorflow.keras.models import model_from_yaml
+from tensorflow.keras.optimizers import get as get_optimizer
 
 from .utils import subtract_params
 from .parameter import BaseParameterClient
+
+
+def train(yaml, parameters, train_config, master_optimizer,
+                 master_loss, custom_objects, data_iterator):
+    """Train a keras model on a worker
+    """
+    optimizer = get_optimizer(master_optimizer)
+    model = model_from_yaml(yaml, custom_objects)
+    model.compile(optimizer=optimizer,
+                       loss=master_loss)
+    model.set_weights(parameters.value)
+
+    feature_iterator, label_iterator = tee(data_iterator, 2)
+    x_train = np.asarray([x for x, y in feature_iterator])
+    y_train = np.asarray([y for x, y in label_iterator])
+    weights_before_training = model.get_weights()
+    if x_train.shape[0] > train_config.get('batch_size'):
+        model.fit(x_train, y_train, **train_config)
+    weights_after_training = model.get_weights()
+    deltas = subtract_params(
+        weights_before_training, weights_after_training)
+    yield deltas
 
 
 class SparkWorker(object):
@@ -35,11 +57,6 @@ class SparkWorker(object):
         feature_iterator, label_iterator = tee(data_iterator, 2)
         x_train = np.asarray([x for x, y in feature_iterator])
         y_train = np.asarray([y for x, y in label_iterator])
-
-        self.model.compile(optimizer=get_optimizer(self.master_optimizer),
-                           loss=self.master_loss,
-                           metrics=self.master_metrics)
-
         weights_before_training = self.model.get_weights()
         if x_train.shape[0] > self.train_config.get('batch_size'):
             self.model.fit(x_train, y_train, **self.train_config)

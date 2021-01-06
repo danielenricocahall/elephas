@@ -12,8 +12,8 @@ from pyspark import keyword_only, RDD
 from pyspark.ml import Estimator, Model
 from pyspark.sql.types import StringType, DoubleType, StructField
 
-from keras.models import model_from_yaml
-from keras.optimizers import get as get_optimizer
+from tensorflow.keras.models import model_from_yaml
+from tensorflow.keras.optimizers import get as get_optimizer
 
 from .spark_model import SparkModel
 from .utils.rdd_utils import from_vector
