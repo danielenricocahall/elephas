@@ -1,5 +1,4 @@
 from enum import Enum
-from typing import Union
 
 import keras
 import numpy as np
@@ -189,44 +188,50 @@ class ModelType(Enum):
     REGRESSION = 2
 
 
-class LossModelTypeMapper:
+class _Singleton(type):
+    """ A metaclass that creates a Singleton base class when called. """
+    _instances = {}
+
+    def __call__(cls, *args):
+        if cls not in cls._instances:
+            cls._instances[cls] = super(_Singleton, cls).__call__(*args)
+        return cls._instances[cls]
+
+
+class Singleton(_Singleton('SingletonMeta', (object,), {})):
+    pass
+
+
+class LossModelTypeMapper(Singleton):
     """
     Mapper for losses -> model type
     """
-    _instance = None
+    def __init__(self):
+        loss_to_model_type = {}
+        loss_to_model_type.update(
+            {'mean_squared_error': ModelType.REGRESSION,
+             'mean_absolute_error': ModelType.REGRESSION,
+             'mse': ModelType.REGRESSION,
+             'mae': ModelType.REGRESSION,
+             'cosine_proximity': ModelType.REGRESSION,
+             'mean_absolute_percentage_error': ModelType.REGRESSION,
+             'mean_squared_logarithmic_error': ModelType.REGRESSION,
+             'logcosh': ModelType.REGRESSION,
+             'binary_crossentropy': ModelType.CLASSIFICATION,
+             'categorical_crossentropy': ModelType.CLASSIFICATION,
+             'sparse_categorical_crossentropy': ModelType.CLASSIFICATION})
+        self.__mapping = loss_to_model_type
 
-    class __LossModelTypeMapper:
-        def __init__(self):
-            loss_to_model_type = {}
-            loss_to_model_type.update(
-                {'mean_squared_error': ModelType.REGRESSION,
-                 'mean_absolute_error': ModelType.REGRESSION,
-                 'mse': ModelType.REGRESSION,
-                 'mae': ModelType.REGRESSION,
-                 'cosine_proximity': ModelType.REGRESSION,
-                 'mean_absolute_percentage_error': ModelType.REGRESSION,
-                 'mean_squared_logarithmic_error': ModelType.REGRESSION,
-                 'logcosh': ModelType.REGRESSION,
-                 'binary_crossentropy': ModelType.CLASSIFICATION,
-                 'categorical_crossentropy': ModelType.CLASSIFICATION,
-                 'sparse_categorical_crossentropy': ModelType.CLASSIFICATION})
-            self.__mapping = loss_to_model_type
+    def get_model_type(self, loss):
+        return self.__mapping.get(loss)
 
-        def get_model_type(self, loss: str):
-            return self.__mapping.get(loss)
-
-        def register_loss(self, loss: Union[str, callable], model_type: ModelType):
-            if callable(loss):
-                loss = loss.__name__
-            self.__mapping.update({loss: model_type})
-
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = LossModelTypeMapper.__LossModelTypeMapper()
-        return cls._instance
+    def register_loss(self, loss, model_type):
+        if callable(loss):
+            loss = loss.__name__
+        self.__mapping.update({loss: model_type})
 
 
-def compute_predictions(model: keras.models.Model, model_type: ModelType, rdd: RDD, features: np.array):
+def compute_predictions(model, model_type, rdd, features):
     predict_function = determine_predict_function(model, model_type)
     predictions = rdd.ctx.parallelize(predict_function(features)).coalesce(1)
     if model_type == ModelType.CLASSIFICATION:
@@ -237,8 +242,8 @@ def compute_predictions(model: keras.models.Model, model_type: ModelType, rdd: R
     return results_rdd
 
 
-def determine_predict_function(model: keras.models.Model,
-                               model_type: ModelType):
+def determine_predict_function(model,
+                               model_type):
     if model_type == ModelType.CLASSIFICATION:
         if isinstance(model, keras.models.Sequential):
             predict_function = model.predict_classes

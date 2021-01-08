@@ -51,7 +51,7 @@ sc = SparkContext(conf=conf)
 # Build RDD from numpy features and labels
 lp_rdd = to_labeled_point(sc, x_train, y_train, categorical=True)
 
-# Initialize SparkModel from tensorflow.keras model and Spark context
+# Initialize SparkModel from Keras model and Spark context
 spark_model = SparkMLlibModel(model=model, frequency='epoch', mode='synchronous')
 
 # Train Spark model

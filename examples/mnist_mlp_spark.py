@@ -50,7 +50,7 @@ model.compile(sgd, 'categorical_crossentropy', ['acc'])
 # Build RDD from numpy features and labels
 rdd = to_simple_rdd(sc, x_train, y_train)
 
-# Initialize SparkModel from tensorflow.keras model and Spark context
+# Initialize SparkModel from Keras model and Spark context
 spark_model = SparkModel(model, frequency='epoch', mode='asynchronous')
 
 # Train Spark model
