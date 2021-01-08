@@ -1,6 +1,3 @@
-This project is now archived. It's been fun working on it, but it's time for me to move on. Thank you for all the support and feedback over the last couple of years. If someone is interested in taking ownership, let's discuss. :v:
----
-
 # Elephas: Distributed Deep Learning with Keras & Spark 
 
 ![Elephas](https://github.com/maxpumperla/elephas/blob/master/elephas-logo.png)
@@ -75,9 +72,9 @@ sc = SparkContext(conf=conf)
 
 Next, you define and compile a Keras model
 ```python
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, Dropout, Activation
-from tensorflow.keras.optimizers import SGD
+from keras.models import Sequential
+from keras.layers.core import Dense, Dropout, Activation
+from keras.optimizers import SGD
 model = Sequential()
 model.add(Dense(128, input_dim=784))
 model.add(Activation('relu'))
@@ -98,7 +95,7 @@ rdd = to_simple_rdd(sc, x_train, y_train)
 
 The basic model in Elephas is the `SparkModel`. You initialize a `SparkModel` by passing in a compiled Keras model, 
 an update frequency and a parallelization mode. After that you can simply `fit` the model on your RDD. Elephas `fit`
-has the same options as a Keras model, so you can pass `epochs`, `batch_size` etc. as you're used to from tensorflow.keras.
+has the same options as a Keras model, so you can pass `epochs`, `batch_size` etc. as you're used to from Keras.
 
 ```python
 from elephas.spark_model import SparkModel
@@ -181,8 +178,8 @@ from hyperopt import STATUS_OK
 from hyperas.distributions import choice, uniform
 
 def data():
-    from tensorflow.keras.datasets import mnist
-    from tensorflow.keras.utils import to_categorical
+    from keras.datasets import mnist
+    from keras.utils import np_utils
     (x_train, y_train), (x_test, y_test) = mnist.load_data()
     x_train = x_train.reshape(60000, 784)
     x_test = x_test.reshape(10000, 784)
@@ -191,15 +188,15 @@ def data():
     x_train /= 255
     x_test /= 255
     nb_classes = 10
-    y_train = to_categorical(y_train, nb_classes)
-    y_test = to_categorical(y_test, nb_classes)
+    y_train = np_utils.to_categorical(y_train, nb_classes)
+    y_test = np_utils.to_categorical(y_test, nb_classes)
     return x_train, y_train, x_test, y_test
 
 
 def model(x_train, y_train, x_test, y_test):
-    from tensorflow.keras.models import Sequential
-    from tensorflow.keras.layers import Dense, Dropout, Activation
-    from tensorflow.keras.optimizers import RMSprop
+    from keras.models import Sequential
+    from keras.layers.core import Dense, Dropout, Activation
+    from keras.optimizers import RMSprop
 
     model = Sequential()
     model.add(Dense(512, input_shape=(784,)))
