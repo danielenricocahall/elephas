@@ -13,7 +13,7 @@ setup(name='elephas',
                         'hyperas',
                         'flask',
                         'six',
-                        'keras',
+                        'keras==2.2.5',
                         'h5py==2.10.0',
                         'pyspark==2.4.5'],
       extras_require={
