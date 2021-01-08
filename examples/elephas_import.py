@@ -1,7 +1,7 @@
 from elephas.java import java_classes
 from elephas.dl4j import ParameterAveragingModel
 from elephas.utils import rdd_utils
-import keras
+import tensorflow.keras as keras
 from tensorflow.keras.utils import to_categorical
 
 
