@@ -12,7 +12,7 @@ scale with [Spark](http://spark.apache.org). Elephas currently supports a number
 applications, including:
 
 - [Data-parallel training of deep learning models](#basic-spark-integration)
-- [Distributed training of ensemble models](#distributed-training-of-ensemble-models)
+- [~~Distributed training of ensemble models~~](#distributed-training-of-ensemble-models)  (removed as of 3.0.0)
 - [~~Distributed hyper-parameter optimization~~](#distributed-hyper-parameter-optimization)  (removed as of 3.0.0)
 
 
@@ -290,6 +290,7 @@ hyperparam_model.minimize(model=model, data=data, max_evals=5)
 ```
 
 ## Distributed training of ensemble models
+<span style="color:red">**UPDATE**: As of 3.0.0, Hyper-parameter optimization features have been removed, since Hyperas is no longer active and was causing versioning compatibility issues. To use these features, install version 2.1 or below.</span>
 
 Building on the last section, it is possible to train ensemble models with elephas by means of running hyper-parameter 
 optimization on large search spaces and defining a resulting voting classifier on the top-n performing models. 
