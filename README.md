@@ -12,6 +12,7 @@ scale with [Spark](http://spark.apache.org). Elephas currently supports a number
 applications, including:
 
 - [Data-parallel training of deep learning models](#basic-spark-integration)
+- [Distributed inference and evaluation of deep learning models](#distributed-inference-and-evaluation)
 - [~~Distributed training of ensemble models~~](#distributed-training-of-ensemble-models)  (removed as of 3.0.0)
 - [~~Distributed hyper-parameter optimization~~](#distributed-hyper-parameter-optimization)  (removed as of 3.0.0)
 
@@ -26,6 +27,7 @@ Table of content:
   * [Introduction](#introduction)
   * [Getting started](#getting-started)
   * [Basic Spark integration](#basic-spark-integration)
+  * [Distributed Inference and Evaluation](#distributed-inference-and-evaluation)
   * [Spark MLlib integration](#spark-mllib-integration)
   * [Spark ML integration](#spark-ml-integration)
   * [Hadoop integration](#hadoop-integration)
@@ -114,7 +116,7 @@ spark-submit --driver-memory 1G ./your_script.py
 Increasing the driver memory even further may be necessary, as the set of parameters in a network may be very large 
 and collecting them on the driver eats up a lot of resources. See the examples folder for a few working examples.
 
-## Distributed Inference / Evaluation
+## Distributed Inference and Evaluation
 
 The `SparkModel` can also be used for distributed inference (prediction) and evaluation. Similar to the `fit` method,  the `predict` and `evaluate` methods
 conform to the Keras Model API. 
