@@ -1,3 +1,4 @@
+import numpy as np
 from tensorflow.keras.datasets import mnist
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Dropout, Activation
@@ -81,7 +82,8 @@ prediction = fitted_pipeline.transform(test_df)
 pnl = prediction.select("label", "prediction")
 pnl.show(100, truncate=False)
 
-prediction_and_label = pnl.rdd.map(lambda row: (row.label, row.prediction))
+prediction_and_label = pnl.rdd.map(lambda row: (row.label, float(np.argmax(row.prediction))))
 metrics = MulticlassMetrics(prediction_and_label)
-print(metrics.precision())
-print(metrics.recall())
+print(metrics.accuracy)
+print(metrics.weightedPrecision)
+print(metrics.weightedRecall)

@@ -173,11 +173,12 @@ calling the transform method on it.
 prediction = fitted_model.transform(test_df)
 pnl = prediction.select("label", "prediction")
 pnl.show(100)
+import numpy as np
+prediction_and_label = pnl.rdd.map(lambda row: (row.label, float(np.argmax(row.prediction))))
 
-prediction_and_label= pnl.rdd.map(lambda row: (row.label, row.prediction))
 metrics = MulticlassMetrics(prediction_and_label)
-print(metrics.precision())
-print(metrics.recall())
+print(metrics.weightedPrecision)
+print(metrics.weightedRecall)
 ```
 
 If the model utilizes custom activation function, layer, or loss function, that will need to be supplied using the `set_custom_objects` method:
