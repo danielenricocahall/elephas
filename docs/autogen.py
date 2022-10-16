@@ -54,12 +54,6 @@ PAGES = [
         ],
     },
     {
-        'page': 'models/hyper-param-model.md',
-        'classes': [
-            hyperparam.HyperParamModel
-        ]
-    },
-    {
         'page': 'parameter/client.md',
         'classes': [
             client.BaseParameterClient,
