@@ -13,6 +13,8 @@ jobs:
           python-version: 3.9
       - name: Install MkDocs
         run: pip install mkdocs
+      - name: Make site directory
+        run: mkdir docs/sources
       - name: Build documentation
         run: mkdocs build -f docs/mkdocs.yml -d docs/sources -c -v
       - name: Deploy documentation
