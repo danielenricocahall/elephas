@@ -7,7 +7,7 @@ site_description: 'Documentation for Elephas, Distributed Deep Learning with Ker
 
 dev_addr: '0.0.0.0:8000'
 
-pages:
+nav:
 - Home: index.md
 - Why use Elephas: why-use-elephas.md
 - Getting started:
