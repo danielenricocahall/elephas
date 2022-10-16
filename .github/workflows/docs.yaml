@@ -16,6 +16,8 @@ jobs:
       - name: Make site directory
         run: mkdir docs/sources
       - name: Build documentation
-        run: mkdocs build -f docs/mkdocs.yml -d docs/sources -c -v
+        run: |
+          mkdocs build -f docs/mkdocs.yml -d docs/sources -c -v
+          ls -al docs/sources
       - name: Deploy documentation
         run: mkdocs gh-deploy -f docs/mkdocs.yml -c -v --force
