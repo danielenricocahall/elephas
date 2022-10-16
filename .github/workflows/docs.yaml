@@ -17,7 +17,7 @@ jobs:
         run: mkdir docs/sources
       - name: Build documentation
         run: |
-          mkdocs build -f docs/mkdocs.yml -d docs/sources -c -v
+          mkdocs build -f docs/mkdocs.yml -d sources -c -v
           ls -al docs/sources
       - name: Deploy documentation
         run: mkdocs gh-deploy -f docs/mkdocs.yml -c -v --force
