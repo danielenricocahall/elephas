@@ -97,9 +97,9 @@ ROOT = 'http://danielenricocahall.com/elephas'
 def get_function_signature(function, method=True):
     wrapped = getattr(function, '_original_function', None)
     if wrapped is None:
-        signature = inspect.getargspec(function)
+        signature = inspect.signature(function)
     else:
-        signature = inspect.getargspec(wrapped)
+        signature = inspect.signature(wrapped)
     defaults = signature.defaults
     if method:
         args = signature.args[1:]
