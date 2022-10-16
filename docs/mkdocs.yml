@@ -1,6 +1,6 @@
 site_name: Elephas Documentation
 theme: readthedocs
-docs_dir: sources
+site_dir: sources
 repo_url: http://github.com/Yoseph-Zuskin/elephas
 site_url: http://Yoseph-Zuskin.github.io/elephas
 site_description: 'Documentation for Elephas, Distributed Deep Learning with Keras & Spark'
