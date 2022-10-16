@@ -11,13 +11,13 @@ jobs:
       - uses: actions/setup-python@v2
         with:
           python-version: 3.9
-      - name: Install MkDocs
-        run: pip install mkdocs
-      - name: Make site directory
-        run: mkdir sources
+      - name: Install dependencies
+        run: |
+          pip install .
+          pip install mkdocs
       - name: Build documentation
         run: |
-          mkdocs build -f docs/mkdocs.yml -d sources -c -v
-          ls -al sources
+          python docs/autogen.py
+          ls -al docs/sources
       - name: Deploy documentation
         run: mkdocs gh-deploy -f docs/mkdocs.yml -c -v --force
