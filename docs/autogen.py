@@ -303,9 +303,9 @@ for subdir, dirs, fnames in os.walk(PWD/'templates'):
         if not os.path.exists(PWD/new_subdir):
             os.makedirs(PWD/new_subdir)
         if fname[-3:] == '.md':
-            fpath = os.path.join(PWD/subdir, PWD/fname)
+            fpath = str(PWD/os.path.join(subdir, fname))
             new_fpath = fpath.replace('templates', 'sources')
-            shutil.copy(PWD/fpath, PWD/new_fpath)
+            shutil.copy(fpath, new_fpath)
 
 
 def read_file(path):
