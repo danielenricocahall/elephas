@@ -20,9 +20,5 @@ jobs:
         run: |
           python docs/autogen.py
           ls -al docs/sources
-      - name: Upload documentation to gh-pages branch
+      - name: Deploy to GitHub Pages
         run: mkdocs gh-deploy -f docs/mkdocs.yml -c -v --force
-      - name: Deploy gh-pages as GitHub Pages website
-        uses: JamesIves/github-pages-deploy-action@v4
-        with:
-          folder: docs/sources
