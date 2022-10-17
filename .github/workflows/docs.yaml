@@ -2,7 +2,7 @@ name: MkDocs documentation
 on:
   push:
     branches:
-      - mkdocs
+      - master
 jobs:
   deploy:
     runs-on: ubuntu-latest
