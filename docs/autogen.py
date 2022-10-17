@@ -107,7 +107,7 @@ def get_function_signature(function, method=True):
 
     for p in parameters:
         st += str(p) + ', '
-    return st + ')'
+    return st[:-2] + ')'
 
 
 def get_class_signature(cls):
