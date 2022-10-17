@@ -1,8 +1,8 @@
 site_name: Elephas Documentation
 theme: readthedocs
 docs_dir: sources
-repo_url: http://github.com/Yoseph-Zuskin/elephas
-site_url: http://Yoseph-Zuskin.github.io/elephas
+repo_url: http://github.com/danielenricocahall/elephas
+site_url: http://danielenricocahall.github.io/elephas
 site_description: 'Documentation for Elephas, Distributed Deep Learning with Keras & Spark'
 
 dev_addr: '0.0.0.0:8000'
