@@ -17,8 +17,6 @@ jobs:
           pip install .
           pip install mkdocs
       - name: Build documentation
-        run: |
-          python docs/autogen.py
-          ls -al docs/sources
+        run: python docs/autogen.py
       - name: Deploy to GitHub Pages
         run: mkdocs gh-deploy -f docs/mkdocs.yml -c -v --force
