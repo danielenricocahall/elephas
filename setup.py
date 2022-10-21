@@ -8,11 +8,7 @@ setup(name='elephas',
       download_url='https://github.com/danielenricocahall/elephas/tarball/3.4.0',
       author='Daniel Cahall',
       author_email='danielenricocahall@gmail.com',
-      install_requires=['cython',
-                        'tensorflow>=2,!=2.2.*',
-                        'flask',
-                        'h5py==3.3.0',
-                        'pyspark<3.4'],
+      install_requires=[line.strip() for line in open('requirements.txt').readlines()],
       extras_require={
         'tests': ['pytest', 'pytest-pep8', 'pytest-cov', 'pytest-spark', 'mock']
     },

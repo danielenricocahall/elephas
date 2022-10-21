@@ -1,13 +1,13 @@
 site_name: Elephas Documentation
 theme: readthedocs
 docs_dir: sources
-repo_url: http://github.com/maxpumperla/elephas
-site_url: http://maxpumperla.com/elephas
+repo_url: http://github.com/danielenricocahall/elephas
+site_url: http://danielenricocahall.github.io/elephas
 site_description: 'Documentation for Elephas, Distributed Deep Learning with Keras & Spark'
 
 dev_addr: '0.0.0.0:8000'
 
-pages:
+nav:
 - Home: index.md
 - Why use Elephas: why-use-elephas.md
 - Getting started:
@@ -18,7 +18,6 @@ pages:
   - SparkModel: models/spark-model.md
   - SparkMLlibModel: models/spark-mllib-model.md
   - ElephasEstimator: models/spark-ml-model.md
-  - HyperParamModel: models/hyper-param-model.md
 - Parameter server:
   - Servers: parameter/server.md
   - Clients: parameter/client.md
@@ -28,4 +27,4 @@ pages:
   - Serialization utils: utils/serialization.md
 - Spark ML and MLlib adapters:
   - Spark ML: adapters/spark-ml.md
-  - Spark MLlib; adapters/spark-mllib.md
+  - Spark MLlib: adapters/spark-mllib.md
