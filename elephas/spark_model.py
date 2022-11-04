@@ -205,6 +205,8 @@ class SparkModel(object):
         model_json = self._master_network.to_json()
         init = self._master_network.get_weights()
         parameters = rdd.context.broadcast(init)
+        if 'callbacks' in train_config:
+            train_config['callbacks'] = [rdd.context.broadcast(callback) for callback in train_config['callbacks']]
 
         if self.mode in ['asynchronous', 'hogwild']:
             print('>>> Initialize workers')

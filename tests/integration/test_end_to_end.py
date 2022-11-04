@@ -174,4 +174,30 @@ def test_training_regression_no_metrics(spark_context, boston_housing_dataset, r
                    spark_model.master_network.evaluate(x_test, y_test), abs_tol=0.01)
 
 
+def test_callbacks(spark_context, mnist_data, classification_model):
+    # Define basic parameters
+    batch_size = 64
+    epochs = 10
+
+    # Load data
+    x_train, y_train, x_test, y_test = mnist_data
+    x_train = x_train[:1000]
+    y_train = y_train[:1000]
+
+    sgd = SGD(lr=0.1)
+    classification_model.compile(sgd, 'categorical_crossentropy', ['acc'])
+
+    # Build RDD from numpy features and labels
+    rdd = to_simple_rdd(spark_context, x_train, y_train)
+
+    # Initialize SparkModel from keras model and Spark context
+    spark_model = SparkModel(classification_model, frequency='epoch',
+                             mode='synchronous',
+                             parameter_server_mode='http',
+                             port=_generate_random_port_number(), num_workers=8)
+    from tensorflow.keras.callbacks import CSVLogger
+    # Train Spark model
+    spark_model.fit(rdd, epochs=epochs, batch_size=batch_size,
+                    verbose=0, validation_split=0., callbacks=[CSVLogger(filename='./train.log')])
+
 
