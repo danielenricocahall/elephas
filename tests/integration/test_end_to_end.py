@@ -1,6 +1,7 @@
 import random
 from functools import wraps
 from math import isclose
+from typing import Callable
 
 from tensorflow.keras.optimizers import SGD
 
@@ -16,7 +17,11 @@ def _generate_random_port_number():
 
 
 def retry_test(stop_max_attempt_number: int):
-    def decorator(test_func_ref):
+    # This is hacky, but when running the integration tests and creating a Flask server or Socket server
+    # it can happen that the port is already in use from previous tests. While the port is randomly generated in
+    # the _generate_random_port_number() function, it can still happen that the port is already in use.
+    # In that case we retry the test a few times to generate a new port.
+    def decorator(test_func_ref: Callable):
         @wraps(test_func_ref)
         def wrapper(*args, **kwargs):
             retry_count = 1
