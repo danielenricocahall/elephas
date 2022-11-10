@@ -177,7 +177,7 @@ def test_training_regression_no_metrics(spark_context, boston_housing_dataset, r
 def test_callbacks(spark_context, mnist_data, classification_model):
     # Define basic parameters
     batch_size = 64
-    epochs = 10
+    epochs = 20
 
     # Load data
     x_train, y_train, x_test, y_test = mnist_data
@@ -195,9 +195,10 @@ def test_callbacks(spark_context, mnist_data, classification_model):
                              mode='synchronous',
                              parameter_server_mode='http',
                              port=_generate_random_port_number(), num_workers=8)
-    from tensorflow.keras.callbacks import CSVLogger
+    from tensorflow.keras.callbacks import CSVLogger, EarlyStopping
     # Train Spark model
     spark_model.fit(rdd, epochs=epochs, batch_size=batch_size,
-                    verbose=0, validation_split=0., callbacks=[CSVLogger(filename='./train.log')])
+                    verbose=0, validation_split=0., callbacks=[EarlyStopping(patience=1, monitor='loss'), CSVLogger('test.csv')])
+    print()
 
 

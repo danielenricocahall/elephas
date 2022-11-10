@@ -38,8 +38,6 @@ class SparkWorker(object):
         y_train = np.asarray([y for x, y in label_iterator])
 
         weights_before_training = self.model.get_weights()
-        if 'callbacks' in self.train_config:
-            self.train_config['callbacks'] = [callback.value for callback in self.train_config['callbacks']]
         if x_train.shape[0] > self.train_config.get('batch_size'):
             history = self.model.fit(x_train, y_train, **self.train_config)
         weights_after_training = self.model.get_weights()

@@ -3,7 +3,7 @@ import subprocess
 from uuid import uuid4
 from pathlib import Path
 from copy import deepcopy
-from functools import partial
+from functools import partial, lru_cache
 from itertools import tee
 from typing import Union
 
@@ -18,10 +18,71 @@ from tensorflow.keras.optimizers import serialize as serialize_optimizer, deseri
 
 from .mllib import to_matrix, from_matrix, to_vector, from_vector
 from .parameter.factory import ClientServerFactory
-from .utils import lp_to_simple_rdd, to_simple_rdd
+from .utils import lp_to_simple_rdd, to_simple_rdd, RWLock
 from .utils import model_to_dict
 from .utils import subtract_params, divide_by
 from .worker import AsynchronousSparkWorker, SparkWorker
+
+@lru_cache(None)
+def lock():
+    return RWLock()
+
+from tensorflow.keras.callbacks import Callback
+
+class ThreadSafeCallback(Callback):
+    def __init__(self, callback):
+        super().__init__()
+        self.callback = callback
+
+    def on_train_begin(self, logs=None):
+        lock().acquire_write()
+        result = self.callback.on_train_begin(logs)
+        lock().release()
+        return result
+
+    def on_train_end(self, logs=None):
+        lock().acquire_write()
+        result = self.callback.on_train_end(logs)
+        lock().release()
+        return result
+
+    def on_batch_begin(self, batch, logs=None):
+        lock().acquire_write()
+        result = self.callback.on_batch_begin(batch, logs)
+        lock().release()
+        return result
+
+    def on_batch_end(self, batch, logs=None):
+        lock().acquire_write()
+        result = self.callback.on_batch_end(batch, logs)
+        lock().release()
+        return result
+
+    def on_epoch_begin(self, epoch, logs=None):
+        lock().acquire_write()
+        result = self.callback.on_epoch_begin(epoch, logs)
+        lock().release()
+        return result
+
+    def on_epoch_end(self, epoch, logs=None):
+        lock().acquire_write()
+        if self.callback.model is None:
+            self.callback.model = self.model
+        result = self.callback.on_epoch_end(epoch, logs)
+        lock().release()
+        return result
+
+    def on_train_batch_begin(self, batch, logs=None):
+        lock().acquire_write()
+        result = self.callback.on_train_batch_begin(batch, logs)
+        lock().release()
+        return result
+
+    def on_train_batch_end(self, batch, logs=None):
+        lock().acquire_write()
+        result = self.callback.on_train_batch_end(batch, logs)
+        lock().release()
+        return result
 
 
 class SparkModel(object):
@@ -71,7 +132,7 @@ class SparkModel(object):
         self.kwargs = kwargs
 
         self.serialized_model = model_to_dict(model)
-        if self.mode is not 'synchronous':
+        if self.mode != 'synchronous':
             factory = ClientServerFactory.get_factory(self.parameter_server_mode)
             self.parameter_server = factory.create_server(self.serialized_model, self.port, self.mode,
                                                           custom_objects=self.custom_objects)
@@ -205,8 +266,6 @@ class SparkModel(object):
         model_json = self._master_network.to_json()
         init = self._master_network.get_weights()
         parameters = rdd.context.broadcast(init)
-        if 'callbacks' in train_config:
-            train_config['callbacks'] = [rdd.context.broadcast(callback) for callback in train_config['callbacks']]
 
         if self.mode in ['asynchronous', 'hogwild']:
             print('>>> Initialize workers')
