@@ -5,7 +5,7 @@ from pathlib import Path
 from copy import deepcopy
 from functools import partial
 from itertools import tee
-from typing import Union
+from typing import Union, List, Dict, Any
 
 import h5py
 import numpy as np
@@ -150,7 +150,7 @@ class SparkModel(object):
     def stop_server(self):
         self.parameter_server.stop()
 
-    def predict(self, data: Union[RDD, np.array]):
+    def predict(self, data: Union[RDD, np.array]) -> List[np.ndarray]:
         """Get prediction probabilities for a numpy array of features
         """
         if isinstance(data, (np.ndarray,)):
@@ -159,7 +159,7 @@ class SparkModel(object):
             data = sc.parallelize(data)
         return self._predict(data)
 
-    def evaluate(self, x_test, y_test, **kwargs):
+    def evaluate(self, x_test: np.array, y_test: np.array, **kwargs) -> Union[List[float], float]:
         from pyspark.sql import SparkSession
         sc = SparkSession.builder.getOrCreate().sparkContext
         test_rdd = to_simple_rdd(sc, x_test, y_test)
@@ -232,19 +232,19 @@ class SparkModel(object):
         if self.mode in ['asynchronous', 'hogwild']:
             self.stop_server()
 
-    def _predict(self, rdd: RDD):
+    def _predict(self, rdd: RDD) -> List[np.ndarray]:
         json_model = self.master_network.to_json()
         weights = self.master_network.get_weights()
         weights = rdd.context.broadcast(weights)
         custom_objs = self.custom_objects
 
-        def _predict(model_as_json, custom_objects, data):
+        def _predict(model_as_json: str, custom_objects: Dict[str, Any], data) -> np.array:
             model = model_from_json(model_as_json, custom_objects)
             model.set_weights(weights.value)
             data = np.array([x for x in data])
             return model.predict(data)
 
-        def _predict_with_indices(model_as_json, custom_objects, data):
+        def _predict_with_indices(model_as_json: str, custom_objects: Dict[str, Any], data):
             model = model_from_json(model_as_json, custom_objects)
             model.set_weights(weights.value)
             data, indices = zip(*data)
@@ -268,7 +268,7 @@ class SparkModel(object):
 
         return predictions
 
-    def _evaluate(self, rdd: RDD, **kwargs):
+    def _evaluate(self, rdd: RDD, **kwargs) -> Union[List[float], float]:
         json_model = self.master_network.to_json()
         optimizer = deserialize_optimizer(self.master_optimizer)
         loss = self.master_loss
@@ -277,7 +277,7 @@ class SparkModel(object):
         custom_objects = self.custom_objects
         metrics = self.master_metrics
 
-        def _evaluate(model, optimizer, loss, custom_objects, metrics, kwargs, data_iterator):
+        def _evaluate(model, optimizer, loss, custom_objects, metrics, kwargs, data_iterator) -> List[List[float], List[int]]:
             model = model_from_json(model, custom_objects)
             model.compile(optimizer, loss, metrics)
             model.set_weights(weights.value)
