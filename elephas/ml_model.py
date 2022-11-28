@@ -1,7 +1,9 @@
 import copy
 import json
 import warnings
+from collections.abc import Callable
 from functools import partial
+from typing import Optional
 
 import h5py
 import numpy as np
@@ -169,6 +171,11 @@ class ElephasTransformer(Model, HasKerasModelConfig, HasLabelCol, HasOutputCol, 
                 'model_type': getattr(self, 'model_type', None)}
 
     def save(self, file_name: str):
+        """
+        Save the model to a HDF5 file.
+        :param file_name:
+        :return:
+        """
         f = h5py.File(file_name, mode='w')
 
         f.attrs['distributed_config'] = json.dumps({
@@ -182,7 +189,7 @@ class ElephasTransformer(Model, HasKerasModelConfig, HasLabelCol, HasOutputCol, 
     def get_model(self):
         return model_from_json(self.get_keras_model_config(), self.get_custom_objects())
 
-    def _transform(self, df):
+    def _transform(self, df: DataFrame) -> DataFrame:
         """Private transform method of a Transformer. This serves as batch-prediction method for our purposes.
         """
         output_col = self.getOutputCol()
@@ -190,7 +197,8 @@ class ElephasTransformer(Model, HasKerasModelConfig, HasLabelCol, HasOutputCol, 
         rdd = df.rdd
         weights = rdd.ctx.broadcast(self.weights)
 
-        def batched_prediction(data, inference_batch_size, features_col, predict_function) -> np.ndarray:
+        def batched_prediction(data, inference_batch_size: int, features_col: str,
+                               predict_function: Callable[[np.array], np.array]) -> np.ndarray:
             # Do prediction in batches instead of materializing the whole partition at once
             batch = []
             preds = []
@@ -217,7 +225,7 @@ class ElephasTransformer(Model, HasKerasModelConfig, HasLabelCol, HasOutputCol, 
                                          custom_objects: dict,
                                          features_col: str,
                                          data,
-                                         inference_batch_size: int = None):
+                                         inference_batch_size: Optional[int] = None) -> np.ndarray:
             model = model_from_json(model_json, custom_objects)
             model.set_weights(weights.value)
             if inference_batch_size is not None and inference_batch_size > 0:
@@ -248,7 +256,12 @@ class ElephasTransformer(Model, HasKerasModelConfig, HasLabelCol, HasOutputCol, 
         return results_df
 
 
-def load_ml_transformer(file_name: str):
+def load_ml_transformer(file_name: str) -> ElephasTransformer:
+    """
+    Load a Transformer from a HDF5 file.
+    :param file_name:
+    :return:
+    """
     f = h5py.File(file_name, mode='r')
     elephas_conf = json.loads(f.attrs.get('distributed_config'), object_hook=as_enum)
     config = elephas_conf.get('config')
