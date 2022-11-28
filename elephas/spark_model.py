@@ -5,11 +5,12 @@ from pathlib import Path
 from copy import deepcopy
 from functools import partial
 from itertools import tee
-from typing import Union, List, Dict, Any
+from typing import Union, List, Dict, Any, Optional, Callable
 
 import h5py
 import numpy as np
 import pyspark
+import tensorflow as tf
 from pyspark import RDD
 from tensorflow.keras.models import load_model
 from tensorflow.keras.models import model_from_json
@@ -101,7 +102,7 @@ class SparkModel(object):
         cluster, default is False
         """
         assert (
-            file_name[-3:] == ".h5" or file_name[-6:] == ".keras"
+                file_name[-3:] == ".h5" or file_name[-6:] == ".keras"
         ), "File name must end with either '.h5' or '.keras'"
 
         if overwrite and not to_hadoop and Path(file_name).exists():
@@ -151,8 +152,7 @@ class SparkModel(object):
         self.parameter_server.stop()
 
     def predict(self, data: Union[RDD, np.array]) -> List[np.ndarray]:
-        """Get prediction probabilities for a numpy array of features
-        """
+        """Perform distributed inference with the model"""
         if isinstance(data, (np.ndarray,)):
             from pyspark.sql import SparkSession
             sc = SparkSession.builder.getOrCreate().sparkContext
@@ -160,6 +160,7 @@ class SparkModel(object):
         return self._predict(data)
 
     def evaluate(self, x_test: np.array, y_test: np.array, **kwargs) -> Union[List[float], float]:
+        """Perform distributed evaluation with the model"""
         from pyspark.sql import SparkSession
         sc = SparkSession.builder.getOrCreate().sparkContext
         test_rdd = to_simple_rdd(sc, x_test, y_test)
@@ -188,8 +189,7 @@ class SparkModel(object):
                 "Choose from one of the modes: asynchronous, synchronous or hogwild")
 
     def _fit(self, rdd: RDD, **kwargs):
-        """Protected train method to make wrapping of modes easier
-        """
+        """Protected train method to make wrapping of modes easier"""
         self._master_network.compile(optimizer=get_optimizer(self.master_optimizer),
                                      loss=self.master_loss,
                                      metrics=self.master_metrics)
@@ -233,6 +233,9 @@ class SparkModel(object):
             self.stop_server()
 
     def _predict(self, rdd: RDD) -> List[np.ndarray]:
+        """
+        Private distributed predict method called by public predict method, after data has been verified to be an RDD
+        """
         json_model = self.master_network.to_json()
         weights = self.master_network.get_weights()
         weights = rdd.context.broadcast(weights)
@@ -269,6 +272,7 @@ class SparkModel(object):
         return predictions
 
     def _evaluate(self, rdd: RDD, **kwargs) -> Union[List[float], float]:
+        """Private distributed evaluate method called by public evaluate method, after data has been verified to be an RDD"""
         json_model = self.master_network.to_json()
         optimizer = deserialize_optimizer(self.master_optimizer)
         loss = self.master_loss
@@ -277,7 +281,8 @@ class SparkModel(object):
         custom_objects = self.custom_objects
         metrics = self.master_metrics
 
-        def _evaluate(model, optimizer, loss, custom_objects, metrics, kwargs, data_iterator) -> List[List[float], List[int]]:
+        def _evaluate(model, optimizer, loss: Callable[[tf.Tensor, tf.Tensor], tf.Tensor], custom_objects: Dict[str, Any], metrics: List[str], kwargs: Dict[str, Any], data_iterator) -> List[
+            List[float], List[int]]:
             model = model_from_json(model, custom_objects)
             model.compile(optimizer, loss, metrics)
             model.set_weights(weights.value)
@@ -295,8 +300,8 @@ class SparkModel(object):
         results = rdd.mapPartitions(partial(_evaluate, json_model, optimizer, loss, custom_objects, metrics, kwargs))
         mapping_function = lambda x: tuple(x[-1] * x[i] for i in range(len(x) - 1)) + (x[-1],)
         reducing_function = lambda x, y: tuple(x[i] + y[i] for i in range(len(x)))
-        agg_loss, *agg_metrics, number_of_samples = results.\
-            map(mapping_function).\
+        agg_loss, *agg_metrics, number_of_samples = results. \
+            map(mapping_function). \
             reduce(reducing_function)
         avg_loss = agg_loss / number_of_samples
         avg_metrics = [agg_metric / number_of_samples for agg_metric in agg_metrics]
@@ -326,8 +331,9 @@ class SparkMLlibModel(SparkModel):
                             custom_objects=custom_objects,
                             batch_size=batch_size, port=port, *args, **kwargs)
 
-    def fit(self, labeled_points, epochs=10, batch_size=32, verbose=0, validation_split=0.1,
-            categorical=False, nb_classes=None):
+    def fit(self, labeled_points: RDD, epochs: int = 10, batch_size: int = 32, verbose: int = 0,
+            validation_split: float = 0.1,
+            categorical: bool = False, nb_classes: Optional[int] = None):
         """Train an elephas model on an RDD of LabeledPoints
         """
         rdd = lp_to_simple_rdd(labeled_points, categorical, nb_classes)
@@ -348,7 +354,7 @@ class SparkMLlibModel(SparkModel):
 
 
 def load_spark_model(
-    file_name: str, from_hadoop: bool = False
+        file_name: str, from_hadoop: bool = False
 ) -> Union[SparkModel, SparkMLlibModel]:
     """
     Load an elephas model from a h5 or keras file. Assumes file is located locally by
