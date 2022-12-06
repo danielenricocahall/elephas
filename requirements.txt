@@ -1,5 +1,5 @@
 cython
-tensorflow>=2,!=2.2.*
+tensorflow>=2,!=2.2.*,<=2.10
 flask
 h5py==3.3.0
 pyspark<3.4
