@@ -1,9 +1,8 @@
 import copy
 import json
 import warnings
-from collections.abc import Callable
 from functools import partial
-from typing import Optional
+from typing import Optional, Callable
 
 import h5py
 import numpy as np

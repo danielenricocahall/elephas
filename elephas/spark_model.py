@@ -281,8 +281,7 @@ class SparkModel(object):
         custom_objects = self.custom_objects
         metrics = self.master_metrics
 
-        def _evaluate(model, optimizer, loss: Callable[[tf.Tensor, tf.Tensor], tf.Tensor], custom_objects: Dict[str, Any], metrics: List[str], kwargs: Dict[str, Any], data_iterator) -> List[
-            List[float], List[int]]:
+        def _evaluate(model, optimizer, loss: Callable[[tf.Tensor, tf.Tensor], tf.Tensor], custom_objects: Dict[str, Any], metrics: List[str], kwargs: Dict[str, Any], data_iterator) -> List[Union[float, int]]:
             model = model_from_json(model, custom_objects)
             model.compile(optimizer, loss, metrics)
             model.set_weights(weights.value)
