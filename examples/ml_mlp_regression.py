@@ -39,7 +39,7 @@ sc = SparkContext(conf=conf)
 df = to_data_frame(sc, x_train, y_train)
 test_df = to_data_frame(sc, x_test, y_test)
 
-sgd = optimizers.SGD(lr=0.000001)
+sgd = optimizers.SGD(learning_rate=0.000001)
 sgd_conf = optimizers.serialize(sgd)
 
 # Initialize Spark ML Estimator

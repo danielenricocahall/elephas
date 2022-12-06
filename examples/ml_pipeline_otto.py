@@ -70,7 +70,7 @@ model.add(Activation('softmax'))
 
 model.compile(loss='categorical_crossentropy', optimizer='adam')
 
-sgd = optimizers.SGD(lr=0.01)
+sgd = optimizers.SGD(learning_rate=0.01)
 sgd_conf = optimizers.serialize(sgd)
 
 # Initialize Elephas Spark ML Estimator

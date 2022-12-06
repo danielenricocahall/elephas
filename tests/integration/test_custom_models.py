@@ -20,7 +20,7 @@ def test_training_custom_activation(mode, spark_context):
     model.add(Dense(1, input_dim=1, activation=custom_activation))
     model.add(Dense(1, activation='sigmoid'))
 
-    sgd = SGD(lr=0.1)
+    sgd = SGD(learning_rate=0.1)
     model.compile(sgd, 'binary_crossentropy', ['acc'])
 
     x_train = np.random.rand(100)
