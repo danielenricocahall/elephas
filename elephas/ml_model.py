@@ -10,7 +10,7 @@ from pyspark import keyword_only
 from pyspark.ml import Estimator, Model
 from pyspark.ml.param.shared import HasOutputCol, HasFeaturesCol, HasLabelCol
 from pyspark.ml.util import DefaultParamsReadable, DefaultParamsWritable
-from pyspark.sql import DataFrame
+from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.types import DoubleType, StructField, ArrayType
 from tensorflow.keras.models import model_from_json
 from tensorflow.keras.optimizers import get as get_optimizer
@@ -250,7 +250,8 @@ class ElephasTransformer(Model, HasKerasModelConfig, HasLabelCol, HasOutputCol, 
         results_rdd = rdd.zip(predictions).map(lambda x: x[0] + x[1])
 
         new_schema.add(output_col_field)
-        results_df = df.sql_ctx.createDataFrame(results_rdd, new_schema)
+        spark_session = SparkSession.builder.getOrCreate()
+        results_df = spark_session.createDataFrame(results_rdd, new_schema)
 
         return results_df
 

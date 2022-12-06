@@ -2,8 +2,8 @@ from pyspark.ml.linalg import Vectors
 import numpy as np
 import random
 
-from pyspark import SparkContext, SparkConf
-from pyspark.sql import SQLContext
+from pyspark.sql import SparkSession
+
 from pyspark.ml.feature import StringIndexer, StandardScaler
 from pyspark.ml import Pipeline
 
@@ -17,9 +17,8 @@ from elephas.ml_model import ElephasEstimator
 data_path = "../"
 
 # Spark contexts
-conf = SparkConf().setAppName('Otto_Spark_ML_Pipeline').setMaster('local[8]')
-sc = SparkContext(conf=conf)
-sql_context = SQLContext._get_or_create(sc)
+spark_session = SparkSession.builder.appName('Otto_Spark_ML_Pipeline').getOrCreate()
+sc = spark_session.sparkContext
 
 
 # Data loader
@@ -44,8 +43,8 @@ def load_data_rdd(csv_file, shuffle=True, train=True):
 
 
 # Define Data frames
-train_df = sql_context.createDataFrame(load_data_rdd("train.csv"), ['features', 'category'])
-test_df = sql_context.createDataFrame(load_data_rdd("test.csv", shuffle=False, train=False), ['features', 'category'])
+train_df = spark_session.createDataFrame(load_data_rdd("train.csv"), ['features', 'category'])
+test_df = spark_session.createDataFrame(load_data_rdd("test.csv", shuffle=False, train=False), ['features', 'category'])
 
 # Preprocessing steps
 string_indexer = StringIndexer(inputCol="category", outputCol="index_category")
