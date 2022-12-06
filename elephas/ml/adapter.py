@@ -8,7 +8,7 @@ def to_data_frame(sc, features, labels, categorical=False):
     """Convert numpy arrays of features and labels into Spark DataFrame
     """
     lp_rdd = to_labeled_point(sc, features, labels, categorical)
-    sql_context = SQLContext(sc)
+    sql_context = SQLContext._get_or_create(sc)
     df = sql_context.createDataFrame(lp_rdd)
     return df
 

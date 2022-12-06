@@ -19,7 +19,7 @@ data_path = "../"
 # Spark contexts
 conf = SparkConf().setAppName('Otto_Spark_ML_Pipeline').setMaster('local[8]')
 sc = SparkContext(conf=conf)
-sql_context = SQLContext(sc)
+sql_context = SQLContext._get_or_create(sc)
 
 
 # Data loader
