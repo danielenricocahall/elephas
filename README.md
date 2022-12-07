@@ -1,4 +1,4 @@
-**# Elephas: Distributed Deep Learning with Keras & Spark 
+# Elephas: Distributed Deep Learning with Keras & Spark 
 
 ![Elephas](https://raw.githubusercontent.com/danielenricocahall/elephas/master/elephas-logo.png)
 
