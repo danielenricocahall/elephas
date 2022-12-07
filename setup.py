@@ -4,7 +4,7 @@ from pathlib import Path
 this_directory = Path(__file__).parent
 long_description = (this_directory / "README.md").read_text()
 setup(name='elephas',
-      version='3.4.6',
+      version='3.4.7',
       description='Deep learning on Spark with Keras',
       long_description=long_description,
       long_description_content_type='text/markdown',
