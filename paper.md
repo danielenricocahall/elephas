@@ -13,12 +13,12 @@ authors:
   - name: Daniel Cahall
     affiliation: 3
 affiliations:
-  - name: IU Internationale Hochschule
-    index: 1
-  - name: Pathmind Inc.
-    index: 2
-  - name: Independent researcher
-    index: 3
+ - name: IU Internationale Hochschule, Erfurt, Germany
+   index: 1
+ - name: Anyscale Inc, San Francisco, USA
+   index: 2
+ - name: Independent researcher, Philadelphia, USA
+   index: 3
 date: 18 November 2021
 bibliography: paper.bib
     
