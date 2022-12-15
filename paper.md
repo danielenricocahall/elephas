@@ -34,7 +34,7 @@ Until version 2.1., elephas also supported distributed hyper-parameter optimizat
 
 Elephas keeps the simplicity and high usability of Keras, thereby allowing for fast prototyping of distributed models.
 When ready, researchers can then scale out their experiments on massive data sets.
-Elephas comes with [full API documentation](http://maxpumperla.com/elephas/) and [examples](https://github.com/maxpumperla/elephas/blob/master/examples/Spark_ML_Pipeline.ipynb) to get you started.
+Elephas comes with [full API documentation](https://danielenricocahall.github.io/elephas/) and [examples](https://github.com/danielenricocahall/elephas/blob/master/examples/Spark_ML_Pipeline.ipynb) to get you started.
 Initiated in late 2015, elephas has been actively maintained since then and has reached maturity for distributed deep learning on Spark.
 
 # Statement of need
