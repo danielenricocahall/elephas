@@ -2,14 +2,15 @@ from setuptools import setup
 from setuptools import find_packages
 from pathlib import Path
 this_directory = Path(__file__).parent
-long_description = (this_directory / "README.md").read_text()
+long_description = (this_directory / "README.md").read_text(encoding="UTF-8")
+version='3.4.8'
 setup(name='elephas',
-      version='3.4.7',
+      version=version,
       description='Deep learning on Spark with Keras',
       long_description=long_description,
       long_description_content_type='text/markdown',
     url='http://github.com/danielenricocahall/elephas',
-      download_url='https://github.com/danielenricocahall/elephas/tarball/3.4.0',
+      download_url=f'https://github.com/danielenricocahall/elephas/tarball/{version}',
       author='Daniel Cahall',
       author_email='danielenricocahall@gmail.com',
       install_requires=['cython',
