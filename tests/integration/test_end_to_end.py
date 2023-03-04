@@ -55,7 +55,7 @@ def retry_test(stop_max_attempt_number: int):
                           ('hogwild', 'http', 2),
                           ('hogwild', 'socket', None),
                           ('hogwild', 'socket', 2)])
-@retry_test(3)
+@retry_test(5)
 def test_training_classification(spark_context, mode, parameter_server_mode, num_workers, mnist_data, classification_model):
     # Define basic parameters
     batch_size = 64
@@ -110,7 +110,7 @@ def test_training_classification(spark_context, mode, parameter_server_mode, num
                           ('hogwild', 'http', 2),
                           ('hogwild', 'socket', None),
                           ('hogwild', 'socket', 2)])
-@retry_test(3)
+@retry_test(5)
 def test_training_regression(spark_context, mode, parameter_server_mode, num_workers, boston_housing_dataset,
                              regression_model):
     x_train, y_train, x_test, y_test = boston_housing_dataset

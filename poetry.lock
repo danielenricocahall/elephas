@@ -223,17 +223,14 @@ protobuf = ["grpcio-tools (>=1.52.0)"]
 
 [[package]]
 name = "h5py"
-version = "3.3.0"
+version = "3.8.0"
 description = "Read and write HDF5 files from Python"
 category = "main"
 optional = false
 python-versions = ">=3.7"
 
 [package.dependencies]
-numpy = [
-    {version = ">=1.17.5", markers = "python_version == \"3.8\""},
-    {version = ">=1.19.3", markers = "python_version >= \"3.9\""},
-]
+numpy = ">=1.14.5"
 
 [[package]]
 name = "idna"
@@ -765,7 +762,7 @@ testing = ["pytest (>=6)", "pytest-checkdocs (>=2.4)", "flake8 (<5)", "pytest-co
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.8,<3.12"
-content-hash = "dabb4ed48f3084887dfb7ce2d8e21114b8ec15e163379a4affd45dc6e4c26a46"
+content-hash = "310a196ed6b62404370acdbfcae16c1333f574764c20bcd0acc3aee0e3ba743b"
 
 [metadata.files]
 absl-py = []
