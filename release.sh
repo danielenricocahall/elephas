@@ -4,7 +4,7 @@
 sudo rm -rf dist/*
 
 # Build Python 3 wheels for current version
-sudo python3 setup.py sdist bdist_wheel
+poetry build -f wheel
 
-# Upload to PyPI with twine. Needs full "skymind" credentials in ~/.pypirc
-twine upload dist/*
+# Upload to PyPI with Poetry.
+poetry publish
