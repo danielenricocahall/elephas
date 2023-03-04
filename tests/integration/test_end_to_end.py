@@ -1,8 +1,5 @@
-import random
-from functools import wraps
+from itertools import count
 from math import isclose
-from typing import Callable
-from urllib.error import URLError
 
 from tensorflow.keras.optimizers import SGD
 
@@ -13,34 +10,8 @@ import pytest
 import numpy as np
 
 
-def _generate_random_port_number():
-    return 3000 + random.randint(0, 950)
-
-
-def retry_test(stop_max_attempt_number: int):
-    # This is hacky, but when running the integration tests and creating a Flask server or Socket server
-    # it can happen that the port is already in use from previous tests. While the port is randomly generated in
-    # the _generate_random_port_number() function, it can still happen that the port is already in use.
-    # In that case we retry the test a few times to generate a new port.
-    def decorator(test_func_ref: Callable):
-        @wraps(test_func_ref)
-        def wrapper(*args, **kwargs):
-            retry_count = 1
-
-            while retry_count < stop_max_attempt_number:
-                try:
-                    return test_func_ref(*args, **kwargs)
-
-                except (ConnectionError, URLError) as connect_error:
-                    connect_message, _ = connect_error.__str__().split("\n")
-                    print(f"Retry error: \"{test_func_ref.__name__}\" --> {connect_message}. "
-                          f"[{retry_count}/{stop_max_attempt_number - 1}] Retrying.")
-                    retry_count += 1
-
-            return test_func_ref(*args, **kwargs)
-
-        return wrapper
-    return decorator
+def _generate_port_number(port=3000, _count=count(1)):
+    return port + next(_count)
 
 # enumerate possible combinations for training mode and parameter server for a classification model while also
 # validatiing multiple workers for repartitioning
@@ -55,7 +26,6 @@ def retry_test(stop_max_attempt_number: int):
                           ('hogwild', 'http', 2),
                           ('hogwild', 'socket', None),
                           ('hogwild', 'socket', 2)])
-@retry_test(5)
 def test_training_classification(spark_context, mode, parameter_server_mode, num_workers, mnist_data, classification_model):
     # Define basic parameters
     batch_size = 64
@@ -74,7 +44,7 @@ def test_training_classification(spark_context, mode, parameter_server_mode, num
 
     # Initialize SparkModel from keras model and Spark context
     spark_model = SparkModel(classification_model, frequency='epoch', num_workers=num_workers,
-                             mode=mode, parameter_server_mode=parameter_server_mode, port=_generate_random_port_number())
+                             mode=mode, parameter_server_mode=parameter_server_mode, port=_generate_port_number())
 
     # Train Spark model
     spark_model.fit(rdd, epochs=epochs, batch_size=batch_size,
@@ -110,7 +80,6 @@ def test_training_classification(spark_context, mode, parameter_server_mode, num
                           ('hogwild', 'http', 2),
                           ('hogwild', 'socket', None),
                           ('hogwild', 'socket', 2)])
-@retry_test(5)
 def test_training_regression(spark_context, mode, parameter_server_mode, num_workers, boston_housing_dataset,
                              regression_model):
     x_train, y_train, x_test, y_test = boston_housing_dataset
@@ -122,7 +91,7 @@ def test_training_regression(spark_context, mode, parameter_server_mode, num_wor
     sgd = SGD(lr=0.0000001)
     regression_model.compile(sgd, 'mse', ['mae', 'mean_absolute_percentage_error'])
     spark_model = SparkModel(regression_model, frequency='epoch', mode=mode, num_workers=num_workers,
-                             parameter_server_mode=parameter_server_mode, port=_generate_random_port_number())
+                             parameter_server_mode=parameter_server_mode, port=_generate_port_number())
 
     # Train Spark model
     spark_model.fit(rdd, epochs=epochs, batch_size=batch_size,
@@ -155,7 +124,7 @@ def test_training_regression_no_metrics(spark_context, boston_housing_dataset, r
     epochs = 1
     sgd = SGD(lr=0.0000001)
     regression_model.compile(sgd, 'mse')
-    spark_model = SparkModel(regression_model, frequency='epoch', mode='synchronous', port=_generate_random_port_number())
+    spark_model = SparkModel(regression_model, frequency='epoch', mode='synchronous', port=_generate_port_number())
 
     # Train Spark model
     spark_model.fit(rdd, epochs=epochs, batch_size=batch_size, verbose=0, validation_split=0.1)
