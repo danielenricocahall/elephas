@@ -86,6 +86,7 @@ class HttpServer(BaseParameterServer):
     def stop(self):
         self.server.terminate()
         self.server.join()
+        self.server.close()
 
     def start_flask_service(self):
         """Define Flask parameter server service.

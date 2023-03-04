@@ -2,6 +2,7 @@ import random
 from functools import wraps
 from math import isclose
 from typing import Callable
+from urllib.error import URLError
 
 from tensorflow.keras.optimizers import SGD
 
@@ -13,7 +14,7 @@ import numpy as np
 
 
 def _generate_random_port_number():
-    return 4000 + random.randint(0, 900)
+    return 3000 + random.randint(0, 950)
 
 
 def retry_test(stop_max_attempt_number: int):
@@ -30,7 +31,7 @@ def retry_test(stop_max_attempt_number: int):
                 try:
                     return test_func_ref(*args, **kwargs)
 
-                except ConnectionError as connect_error:
+                except (ConnectionError, URLError) as connect_error:
                     connect_message, _ = connect_error.__str__().split("\n")
                     print(f"Retry error: \"{test_func_ref.__name__}\" --> {connect_message}. "
                           f"[{retry_count}/{stop_max_attempt_number - 1}] Retrying.")

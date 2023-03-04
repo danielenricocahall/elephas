@@ -1,0 +1,28 @@
+[tool.poetry]
+name = "elephas"
+version = "4.0.0"
+description = "Distributed deep learning on Spark with Keras"
+readme = "README.md"
+homepage = "https://danielenricocahall.github.io/elephas/"
+authors = ["Daniel Cahall <danielenricocahall@gmail.com>"]
+license = "MIT"
+
+[tool.poetry.dependencies]
+python = ">=3.8,<3.12"
+tensorflow = ">2.2,<=2.10"
+Flask = "^2.2.3"
+h5py = "3.3.0"
+pyspark = "<=3.3"
+Cython = "^0.29.33"
+numpy = "1.23.5"
+
+[tool.poetry.dev-dependencies]
+pytest = "^7.2.1"
+pytest-pep8 = "^1.0.6"
+pytest-cov = "^4.0.0"
+pytest-spark = "^0.6.0"
+mock = "^5.0.1"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

@@ -25,7 +25,7 @@ from .utils import subtract_params, divide_by
 from .worker import AsynchronousSparkWorker, SparkWorker
 
 
-class SparkModel(object):
+class SparkModel:
 
     def __init__(self, model, mode='asynchronous', frequency='epoch', parameter_server_mode='http', num_workers=None,
                  custom_objects=None, batch_size=32, port=4000, *args, **kwargs):
@@ -72,7 +72,7 @@ class SparkModel(object):
         self.kwargs = kwargs
 
         self.serialized_model = model_to_dict(model)
-        if self.mode is not 'synchronous':
+        if self.mode != 'synchronous':
             factory = ClientServerFactory.get_factory(self.parameter_server_mode)
             self.parameter_server = factory.create_server(self.serialized_model, self.port, self.mode,
                                                           custom_objects=self.custom_objects)
