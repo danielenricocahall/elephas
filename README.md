@@ -334,3 +334,7 @@ data-parallel deep-learning algorithms.
 ## Maintainers / Contributions
 
 This great project was started by Max Pumperla, and is currently maintained by Daniel Cahall (https://github.com/danielenricocahall). If you have any questions, please feel free to open up an issue or send an email to danielenricocahall@gmail.com. If you want to contribute, feel free to submit a PR, or start a conversation about how we can go about implementing something.
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=danielenricocahall/elephas&type=Date)](https://star-history.com/#danielenricocahall/elephas&Date)
