@@ -383,7 +383,7 @@ def load_spark_model(
     if from_hadoop:
         Path(file_name).unlink()
 
-    if class_name == "SparkModel":
+    if class_name == SparkModel.__name__:
         return SparkModel(model=model, **config)
-    elif class_name == "SparkMLlibModel":
+    elif class_name == SparkMLlibModel.__name__:
         return SparkMLlibModel(model=model, **config)

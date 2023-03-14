@@ -1,7 +1,9 @@
+from typing import Dict, Any, Optional
+
 from tensorflow.keras.models import model_from_json, Model
 
 
-def model_to_dict(model: Model):
+def model_to_dict(model: Model) -> Dict[str, Any]:
     """Turns a Keras model into a Python dictionary
 
     :param model: Keras model instance
@@ -10,7 +12,7 @@ def model_to_dict(model: Model):
     return dict(model=model.to_json(), weights=model.get_weights())
 
 
-def dict_to_model(_dict: dict, custom_objects: dict = None):
+def dict_to_model(_dict: Dict[str, Any], custom_objects: Optional[Dict[str, Any]] = None):
     """Turns a Python dictionary with model architecture and weights
     back into a Keras model
 

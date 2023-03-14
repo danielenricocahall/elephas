@@ -1,3 +1,5 @@
+from typing import Optional, Tuple
+
 from pyspark import RDD, SparkContext
 from pyspark.mllib.regression import LabeledPoint
 import numpy as np
@@ -5,7 +7,7 @@ import numpy as np
 from ..mllib.adapter import to_vector, from_vector
 
 
-def to_simple_rdd(sc: SparkContext, features: np.array, labels: np.array):
+def to_simple_rdd(sc: SparkContext, features: np.array, labels: np.array) -> RDD:
     """Convert numpy arrays of features and labels into
     an RDD of pairs.
 
@@ -18,7 +20,8 @@ def to_simple_rdd(sc: SparkContext, features: np.array, labels: np.array):
     return sc.parallelize(pairs)
 
 
-def to_labeled_point(sc: SparkContext, features: np.array, labels: np.array, categorical: bool = False):
+def to_labeled_point(sc: SparkContext, features: np.array, labels: np.array, categorical: bool = False) -> RDD[
+    LabeledPoint]:
     """Convert numpy arrays of features and labels into
     a LabeledPoint RDD for MLlib and ML integration.
 
@@ -38,7 +41,7 @@ def to_labeled_point(sc: SparkContext, features: np.array, labels: np.array, cat
     return sc.parallelize(labeled_points)
 
 
-def from_labeled_point(rdd: RDD, categorical: bool = False, nb_classes: int = None):
+def from_labeled_point(rdd: RDD[LabeledPoint], categorical: bool = False, nb_classes: Optional[int] = None) -> Tuple[np.array, np.array]:
     """Convert a LabeledPoint RDD back to a pair of numpy arrays
 
     :param rdd: LabeledPoint RDD
@@ -59,7 +62,7 @@ def from_labeled_point(rdd: RDD, categorical: bool = False, nb_classes: int = No
     return features, labels
 
 
-def encode_label(label: np.array, nb_classes: int):
+def encode_label(label: np.array, nb_classes: int) -> np.array:
     """One-hot encoding of a single label
 
     :param label: class label (int or double without floating point digits)
@@ -71,7 +74,7 @@ def encode_label(label: np.array, nb_classes: int):
     return encoded
 
 
-def lp_to_simple_rdd(lp_rdd: RDD, categorical: bool = False, nb_classes: int = None):
+def lp_to_simple_rdd(lp_rdd: RDD[LabeledPoint], categorical: bool = False, nb_classes: int = None) -> RDD:
     """Convert a LabeledPoint RDD into an RDD of feature-label pairs
 
     :param lp_rdd: LabeledPoint RDD of features and labels

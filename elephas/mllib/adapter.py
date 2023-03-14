@@ -1,12 +1,13 @@
-from pyspark.mllib.linalg import Matrices, Vectors
+import numpy as np
+from pyspark.mllib.linalg import Matrices, Vectors, Matrix, Vector
 
 
-def from_matrix(matrix):
+def from_matrix(matrix: Matrix):
     """Convert MLlib Matrix to numpy array """
     return matrix.toArray()
 
 
-def to_matrix(np_array):
+def to_matrix(np_array: np.array):
     """Convert numpy array to MLlib Matrix
     """
     if len(np_array.shape) == 2:
@@ -18,13 +19,13 @@ def to_matrix(np_array):
                         "numpy array, got {}".format(len(np_array.shape)))
 
 
-def from_vector(vector):
+def from_vector(vector: Vector):
     """Convert MLlib Vector to numpy array
     """
     return vector.toArray()
 
 
-def to_vector(np_array):
+def to_vector(np_array: np.array):
     """Convert numpy array to MLlib Vector
     """
     if len(np_array.shape) == 1:

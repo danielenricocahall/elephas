@@ -52,7 +52,7 @@ class HttpClient(BaseParameterClient):
         self.headers = {'Content-Type': 'application/elephas'}
 
     def get_parameters(self):
-        request = urllib2.Request('http://{}/parameters'.format(self.master_url),
+        request = urllib2.Request(f'http://{self.master_url}/parameters',
                                   headers=self.headers)
         pickled_weights = urllib2.urlopen(request).read()
         return pickle.loads(pickled_weights)

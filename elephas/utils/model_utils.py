@@ -68,12 +68,3 @@ def as_enum(d):
         return getattr(ModelType, member)
     else:
         return d
-
-
-def argmax(col: Union[str, Column]) -> Column:
-    """
-    returns expression for finding the argmax in an array column
-    :param col: array column to find argmax of
-    :return: expression which can be used in `select` or `withColumn`
-    """
-    return F.expr(f'array_position({col}, array_max({col})) - 1')

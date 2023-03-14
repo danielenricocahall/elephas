@@ -1,8 +1,12 @@
+from typing import Union
+
 import numpy as np
 import pytest
 from pyspark.ml import Pipeline
 from pyspark.mllib.evaluation import MulticlassMetrics, RegressionMetrics
+from pyspark.sql import Column
 from pyspark.sql.types import DoubleType
+import pyspark.sql.functions as F
 from tensorflow.keras import optimizers
 from tensorflow.keras.activations import relu
 from tensorflow.keras.layers import Dense
@@ -10,7 +14,16 @@ from tensorflow.keras.models import Sequential
 
 from elephas.ml.adapter import to_data_frame
 from elephas.ml_model import ElephasEstimator, load_ml_estimator, ElephasTransformer, load_ml_transformer
-from elephas.utils.model_utils import ModelType, argmax
+from elephas.utils.model_utils import ModelType
+
+
+def argmax(col: Union[str, Column]) -> Column:
+    """
+    returns expression for finding the argmax in an array column
+    :param col: array column to find argmax of
+    :return: expression which can be used in `select` or `withColumn`
+    """
+    return F.expr(f'array_position({col}, array_max({col})) - 1')
 
 
 def test_serialization_transformer(classification_model):

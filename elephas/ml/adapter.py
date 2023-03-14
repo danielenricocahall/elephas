@@ -1,9 +1,14 @@
+from typing import Optional
+
+import numpy as np
+import pyspark.sql
+from pyspark import SparkContext
 from pyspark.mllib.regression import LabeledPoint
 from ..utils.rdd_utils import from_labeled_point, to_labeled_point, lp_to_simple_rdd
 from pyspark.mllib.linalg import Vector as MLLibVector, Vectors as MLLibVectors
 
 
-def to_data_frame(sc, features, labels, categorical=False):
+def to_data_frame(sc: SparkContext, features: np.array, labels: np.array, categorical: bool = False):
     """Convert numpy arrays of features and labels into Spark DataFrame
     """
     from pyspark.sql import SparkSession
@@ -12,7 +17,7 @@ def to_data_frame(sc, features, labels, categorical=False):
     return df
 
 
-def from_data_frame(df, categorical=False, nb_classes=None):
+def from_data_frame(df: pyspark.sql.DataFrame, categorical: bool = False, nb_classes: Optional[int] = None):
     """Convert DataFrame back to pair of numpy arrays
     """
     lp_rdd = df.rdd.map(lambda row: LabeledPoint(row.label, row.features))
@@ -20,14 +25,18 @@ def from_data_frame(df, categorical=False, nb_classes=None):
     return features, labels
 
 
-def df_to_simple_rdd(df, categorical=False, nb_classes=None, features_col='features', label_col='label'):
+def df_to_simple_rdd(df: pyspark.sql.DataFrame,
+                     categorical: bool = False,
+                     nb_classes: Optional[int] = None,
+                     features_col: str = 'features',
+                     label_col: str = 'label'):
     """Convert DataFrame into RDD of pairs
     """
     from pyspark.sql import SparkSession
     spark_session = SparkSession.builder.getOrCreate()
     df.createOrReplaceTempView("temp_table")
     selected_df = spark_session.sql(
-        "SELECT {0} AS features, {1} as label from temp_table".format(features_col, label_col))
+        f"SELECT {features_col} AS features, {label_col} as label from temp_table")
     if isinstance(selected_df.first().features, MLLibVector):
         lp_rdd = selected_df.rdd.map(
             lambda row: LabeledPoint(row.label, row.features))
