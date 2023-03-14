@@ -6,6 +6,7 @@
 
 [![Build Status](https://github.com/danielenricocahall/elephas/actions/workflows/ci.yaml/badge.svg)](https://github.com/danielenricocahall/elephas/actions/workflows/ci.yaml/badge.svg)
 [![license](https://img.shields.io/github/license/mashape/apistatus.svg?maxAge=2592000)](https://github.com/danielenricocahall/elephas/blob/master/LICENSE)
+[![Supported Versions](https://img.shields.io/badge/python-3.8%20%7C%203.9%20%7C%203.10-blue)](https://img.shields.io/badge/python-3.8%20%7C%203.9%20%7C%203.10-blue)
 
 Elephas is an extension of [Keras](http://keras.io), which allows you to run distributed deep learning models at 
 scale with [Spark](http://spark.apache.org). Elephas currently supports a number of 
@@ -333,3 +334,7 @@ data-parallel deep-learning algorithms.
 ## Maintainers / Contributions
 
 This great project was started by Max Pumperla, and is currently maintained by Daniel Cahall (https://github.com/danielenricocahall). If you have any questions, please feel free to open up an issue or send an email to danielenricocahall@gmail.com. If you want to contribute, feel free to submit a PR, or start a conversation about how we can go about implementing something.
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=danielenricocahall/elephas&type=Date)](https://star-history.com/#danielenricocahall/elephas&Date)
