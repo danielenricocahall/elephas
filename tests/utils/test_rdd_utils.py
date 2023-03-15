@@ -71,8 +71,9 @@ def test_lp_to_simple_rdd_categorical(spark_context):
     lp_rdd = rdd_utils.to_labeled_point(spark_context, features, labels, True)
 
     rdd = rdd_utils.lp_to_simple_rdd(lp_rdd, categorical=True, nb_classes=3)
-    assert rdd.first()[0].shape == (10,)
-    assert rdd.first()[1].shape == (3,)
+    first_element = rdd.first()
+    assert first_element[0].shape == (10,)
+    assert first_element[1].shape == (3,)
 
 
 def test_lp_to_simple_rdd_not_categorical(spark_context):
@@ -81,5 +82,17 @@ def test_lp_to_simple_rdd_not_categorical(spark_context):
     lp_rdd = rdd_utils.to_labeled_point(spark_context, features, labels, False)
 
     rdd = rdd_utils.lp_to_simple_rdd(lp_rdd, categorical=False, nb_classes=3)
-    assert rdd.first()[0].shape == (10,)
-    assert rdd.first()[1] == 2.0
+    first_element = rdd.first()
+    assert first_element[0].shape == (10,)
+    assert first_element[1] == 2.0
+
+
+def test_simple_rdd_to_lp_categorical_nb_class_not_supplied(spark_context):
+    features = np.ones((2, 10))
+    labels = np.asarray([[0, 0, 1.0], [0, 1.0, 0]])
+    lp_rdd = rdd_utils.to_labeled_point(spark_context, features, labels, True)
+
+    rdd = rdd_utils.lp_to_simple_rdd(lp_rdd, categorical=True)
+    first_element = rdd.first()
+    assert first_element[0].shape == (10,)
+    assert first_element[1].shape == (3,)

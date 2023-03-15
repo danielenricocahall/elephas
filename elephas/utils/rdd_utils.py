@@ -31,17 +31,12 @@ def to_labeled_point(sc: SparkContext, features: np.array, labels: np.array, cat
     :param categorical: boolean, whether labels are already one-hot encoded or not
     :return: LabeledPoint RDD with features and labels
     """
-    labeled_points = []
-    for x, y in zip(features, labels):
-        if categorical:
-            lp = LabeledPoint(np.argmax(y), to_vector(x))
-        else:
-            lp = LabeledPoint(y, to_vector(x))
-        labeled_points.append(lp)
+    labeled_points = [LabeledPoint(np.argmax(y) if categorical else y, to_vector(x)) for x, y in zip(features, labels)]
     return sc.parallelize(labeled_points)
 
 
-def from_labeled_point(rdd: RDD[LabeledPoint], categorical: bool = False, nb_classes: Optional[int] = None) -> Tuple[np.array, np.array]:
+def from_labeled_point(rdd: RDD[LabeledPoint], categorical: bool = False, nb_classes: Optional[int] = None) -> Tuple[
+    np.array, np.array]:
     """Convert a LabeledPoint RDD back to a pair of numpy arrays
 
     :param rdd: LabeledPoint RDD
@@ -49,16 +44,14 @@ def from_labeled_point(rdd: RDD[LabeledPoint], categorical: bool = False, nb_cla
     :param nb_classes: optional int, indicating the number of class labels
     :return: pair of numpy arrays, features and labels
     """
-    features = np.asarray(
-        rdd.map(lambda lp: from_vector(lp.features)).collect())
-    labels = np.asarray(rdd.map(lambda lp: lp.label).collect(), dtype='int32')
+    features_and_labels = rdd.map(lambda lp: (from_vector(lp.features), int(lp.label)))
+    features, labels = zip(*features_and_labels.collect())
+    features = np.array(features)
+    labels = np.array(labels)
     if categorical:
         if not nb_classes:
             nb_classes = np.max(labels) + 1
-        temp = np.zeros((len(labels), nb_classes))
-        for i, label in enumerate(labels):
-            temp[i, label] = 1.
-        labels = temp
+        labels = np.stack(map(lambda x: encode_label(x, nb_classes), labels))
     return features, labels
 
 
@@ -84,9 +77,7 @@ def lp_to_simple_rdd(lp_rdd: RDD[LabeledPoint], categorical: bool = False, nb_cl
     """
     if categorical:
         if not nb_classes:
-            labels = np.asarray(lp_rdd.map(
-                lambda lp: lp.label).collect(), dtype='int32')
-            nb_classes = np.max(labels) + 1
+            nb_classes = lp_rdd.map(lambda lp: lp.label).map(int).max() + 1
         rdd = lp_rdd.map(lambda lp: (from_vector(lp.features),
                                      encode_label(lp.label, nb_classes)))
     else:
