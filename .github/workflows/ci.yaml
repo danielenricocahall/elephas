@@ -5,6 +5,11 @@ on:
     branches:
       - "**"
       - "!gh-pages"
+    paths-ignore:
+      - '**/README.md'
+      - '**/CONTRIBUTING.md'
+      - '**/pyproject.toml'
+      - 'docs/**'
 
 jobs:
   build:
