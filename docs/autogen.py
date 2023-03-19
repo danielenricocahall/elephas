@@ -12,17 +12,6 @@ from elephas.utils import functional_utils, rdd_utils, serialization
 from elephas.ml import adapter as ml_adapter
 from elephas.mllib import  adapter as mllib_adapter
 
-import sys
-if sys.version[0] == '2':
-    reload(sys)
-    sys.setdefaultencoding('utf8')
-
-
-EXCLUDE = {
-    'SocketClient',
-    'SocketServer'
-}
-
 PWD = Path(__file__).parent
 
 PAGES = [
@@ -303,8 +292,6 @@ def collect_class_methods(cls, methods):
         return [getattr(cls, m) if isinstance(m, str) else m for m in methods]
     methods = []
     for _, method in inspect.getmembers(cls, predicate=inspect.isroutine):
-        if method.__name__[0] == '_' or method.__name__ in EXCLUDE:
-            continue
         methods.append(method)
     return methods
 
@@ -329,8 +316,6 @@ def read_page_data(page_data, type):
     for module in page_data.get('all_module_{}'.format(type), []):
         module_data = []
         for name in dir(module):
-            if name[0] == '_' or name in EXCLUDE:
-                continue
             module_member = getattr(module, name)
             if (inspect.isclass(module_member) and type == 'classes' or
                inspect.isfunction(module_member) and type == 'functions'):
