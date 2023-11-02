@@ -65,7 +65,7 @@ def test_spark_ml_model_classification(spark_context, classification_model, mnis
     df = to_data_frame(spark_context, x_train, y_train, categorical=True)
     test_df = to_data_frame(spark_context, x_test, y_test, categorical=True)
 
-    sgd = optimizers.SGD(learning_rate=0.01, decay=1e-6, momentum=0.9, nesterov=True)
+    sgd = optimizers.SGD(learning_rate=0.01, weight_decay=1e-6, momentum=0.9, nesterov=True)
     sgd_conf = optimizers.serialize(sgd)
 
     # Initialize Spark ML Estimator
@@ -283,7 +283,7 @@ def test_predict_classes_probability(spark_context, classification_model, mnist_
     df = to_data_frame(spark_context, x_train, y_train, categorical=True)
     test_df = to_data_frame(spark_context, x_test, y_test, categorical=True)
 
-    sgd = optimizers.SGD(learning_rate=0.01, decay=1e-6, momentum=0.9, nesterov=True)
+    sgd = optimizers.SGD(learning_rate=0.01, weight_decay=1e-6, momentum=0.9, nesterov=True)
     sgd_conf = optimizers.serialize(sgd)
 
     # Initialize Spark ML Estimator
@@ -320,7 +320,7 @@ def test_batch_predict_classes_probability(spark_context, classification_model, 
     df = to_data_frame(spark_context, x_train, y_train, categorical=True)
     test_df = to_data_frame(spark_context, x_test, y_test, categorical=True)
 
-    sgd = optimizers.SGD(learning_rate=0.01, decay=1e-6, momentum=0.9, nesterov=True)
+    sgd = optimizers.SGD(learning_rate=0.01, weight_decay=1e-6, momentum=0.9, nesterov=True)
     sgd_conf = optimizers.serialize(sgd)
 
     # Initialize Spark ML Estimator
@@ -355,7 +355,7 @@ def test_batch_predict_classes_probability(spark_context, classification_model, 
 
 
 def test_save_pipeline(spark_context, classification_model):
-    sgd = optimizers.SGD(learning_rate=0.01, decay=1e-6, momentum=0.9, nesterov=True)
+    sgd = optimizers.SGD(learning_rate=0.01, weight_decay=1e-6, momentum=0.9, nesterov=True)
     sgd_conf = optimizers.serialize(sgd)
 
     # Initialize Spark ML Estimator
