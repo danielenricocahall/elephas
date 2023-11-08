@@ -9,10 +9,10 @@ license = "MIT"
 
 [tool.poetry.dependencies]
 python = ">=3.8,<3.12"
-tensorflow = "<=2.12"
+tensorflow = "<=2.14.0"
 Flask = "^2.2.3"
 h5py = "3.8.0"
-pyspark = "<=3.3"
+pyspark = "<=3.5.0"
 Cython = "^0.29.33"
 numpy = "1.23.5"
 
