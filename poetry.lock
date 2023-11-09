@@ -78,11 +78,11 @@ python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,!=3.6.*,>=2.7
 
 [[package]]
 name = "coverage"
-version = "7.2.1"
+version = "7.3.2"
 description = "Code coverage measurement for Python"
 category = "dev"
 optional = false
-python-versions = ">=3.7"
+python-versions = ">=3.8"
 
 [package.dependencies]
 tomli = {version = "*", optional = true, markers = "python_full_version <= \"3.11.0a6\" and extra == \"toml\""}
@@ -186,14 +186,14 @@ requests = ["requests (>=2.20.0,<3.0.0dev)"]
 
 [[package]]
 name = "google-auth-oauthlib"
-version = "0.4.6"
+version = "1.0.0"
 description = "Google Authentication Library"
 category = "main"
 optional = false
 python-versions = ">=3.6"
 
 [package.dependencies]
-google-auth = ">=1.0.0"
+google-auth = ">=2.15.0"
 requests-oauthlib = ">=0.7.0"
 
 [package.extras]
@@ -288,28 +288,11 @@ i18n = ["Babel (>=2.7)"]
 
 [[package]]
 name = "keras"
-version = "2.10.0"
+version = "2.13.1"
 description = "Deep learning for humans."
 category = "main"
 optional = false
-python-versions = "*"
-
-[[package]]
-name = "keras-preprocessing"
-version = "1.1.2"
-description = "Easy data preprocessing and data augmentation for deep learning models"
-category = "main"
-optional = false
-python-versions = "*"
-
-[package.dependencies]
-numpy = ">=1.9.1"
-six = ">=1.9.0"
-
-[package.extras]
-image = ["scipy (>=0.14)", "Pillow (>=5.2.0)"]
-pep8 = ["flake8"]
-tests = ["pandas", "pillow", "tensorflow", "keras", "pytest", "pytest-xdist", "pytest-cov"]
+python-versions = ">=3.8"
 
 [[package]]
 name = "libclang"
@@ -420,15 +403,15 @@ testing = ["pytest", "pytest-benchmark"]
 
 [[package]]
 name = "protobuf"
-version = "3.19.6"
-description = "Protocol Buffers"
+version = "4.24.4"
+description = ""
 category = "main"
 optional = false
-python-versions = ">=3.5"
+python-versions = ">=3.7"
 
 [[package]]
 name = "py4j"
-version = "0.10.9.5"
+version = "0.10.9.7"
 description = "Enables Python programs to dynamically access arbitrary Java objects"
 category = "main"
 optional = false
@@ -455,20 +438,21 @@ pyasn1 = ">=0.4.6,<0.5.0"
 
 [[package]]
 name = "pyspark"
-version = "3.3.0"
+version = "3.5.0"
 description = "Apache Spark Python API"
 category = "main"
 optional = false
-python-versions = ">=3.7"
+python-versions = ">=3.8"
 
 [package.dependencies]
-py4j = "0.10.9.5"
+py4j = "0.10.9.7"
 
 [package.extras]
+connect = ["googleapis-common-protos (>=1.56.4)", "grpcio-status (>=1.56.0)", "grpcio (>=1.56.0)", "numpy (>=1.15)", "pandas (>=1.0.5)", "pyarrow (>=4.0.0)"]
 ml = ["numpy (>=1.15)"]
 mllib = ["numpy (>=1.15)"]
-pandas_on_spark = ["numpy (>=1.15)", "pandas (>=1.0.5)", "pyarrow (>=1.0.0)"]
-sql = ["pandas (>=1.0.5)", "pyarrow (>=1.0.0)"]
+pandas_on_spark = ["numpy (>=1.15)", "pandas (>=1.0.5)", "pyarrow (>=4.0.0)"]
+sql = ["numpy (>=1.15)", "pandas (>=1.0.5)", "pyarrow (>=4.0.0)"]
 
 [[package]]
 name = "pytest"
@@ -596,75 +580,65 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*"
 
 [[package]]
 name = "tensorboard"
-version = "2.10.1"
+version = "2.13.0"
 description = "TensorBoard lets you watch Tensors Flow"
 category = "main"
 optional = false
-python-versions = ">=3.6"
+python-versions = ">=3.8"
 
 [package.dependencies]
 absl-py = ">=0.4"
 google-auth = ">=1.6.3,<3"
-google-auth-oauthlib = ">=0.4.1,<0.5"
-grpcio = ">=1.24.3"
+google-auth-oauthlib = ">=0.5,<1.1"
+grpcio = ">=1.48.2"
 markdown = ">=2.6.8"
 numpy = ">=1.12.0"
-protobuf = ">=3.9.2,<3.20"
+protobuf = ">=3.19.6"
 requests = ">=2.21.0,<3"
-tensorboard-data-server = ">=0.6.0,<0.7.0"
-tensorboard-plugin-wit = ">=1.6.0"
+tensorboard-data-server = ">=0.7.0,<0.8.0"
 werkzeug = ">=1.0.1"
 
 [[package]]
 name = "tensorboard-data-server"
-version = "0.6.1"
+version = "0.7.2"
 description = "Fast data loading for TensorBoard"
-category = "main"
-optional = false
-python-versions = ">=3.6"
-
-[[package]]
-name = "tensorboard-plugin-wit"
-version = "1.8.1"
-description = "What-If Tool TensorBoard plugin."
-category = "main"
-optional = false
-python-versions = "*"
-
-[[package]]
-name = "tensorflow"
-version = "2.10.0"
-description = "TensorFlow is an open source machine learning framework for everyone."
 category = "main"
 optional = false
 python-versions = ">=3.7"
 
+[[package]]
+name = "tensorflow"
+version = "2.13.1"
+description = "TensorFlow is an open source machine learning framework for everyone."
+category = "main"
+optional = false
+python-versions = ">=3.8"
+
 [package.dependencies]
 absl-py = ">=1.0.0"
 astunparse = ">=1.6.0"
-flatbuffers = ">=2.0"
+flatbuffers = ">=23.1.21"
 gast = ">=0.2.1,<=0.4.0"
 google-pasta = ">=0.1.1"
 grpcio = ">=1.24.3,<2.0"
 h5py = ">=2.9.0"
-keras = ">=2.10.0,<2.11"
-keras-preprocessing = ">=1.1.1"
+keras = ">=2.13.1,<2.14"
 libclang = ">=13.0.0"
-numpy = ">=1.20"
+numpy = ">=1.22,<=1.24.3"
 opt-einsum = ">=2.3.2"
 packaging = "*"
-protobuf = ">=3.9.2,<3.20"
+protobuf = ">=3.20.3,<4.21.0 || >4.21.0,<4.21.1 || >4.21.1,<4.21.2 || >4.21.2,<4.21.3 || >4.21.3,<4.21.4 || >4.21.4,<4.21.5 || >4.21.5,<5.0.0dev"
 six = ">=1.12.0"
-tensorboard = ">=2.10,<2.11"
-tensorflow-estimator = ">=2.10.0,<2.11"
-tensorflow-io-gcs-filesystem = ">=0.23.1"
+tensorboard = ">=2.13,<2.14"
+tensorflow-estimator = ">=2.13.0,<2.14"
+tensorflow-io-gcs-filesystem = {version = ">=0.23.1", markers = "platform_machine != \"arm64\" or platform_system != \"Darwin\""}
 termcolor = ">=1.1.0"
-typing-extensions = ">=3.6.6"
+typing-extensions = ">=3.6.6,<4.6.0"
 wrapt = ">=1.11.0"
 
 [[package]]
 name = "tensorflow-estimator"
-version = "2.10.0"
+version = "2.13.0"
 description = "TensorFlow Estimator."
 category = "main"
 optional = false
@@ -741,7 +715,7 @@ watchdog = ["watchdog"]
 
 [[package]]
 name = "wrapt"
-version = "1.15.0"
+version = "1.14.1"
 description = "Module for decorators, wrappers and monkey patching."
 category = "main"
 optional = false
@@ -762,7 +736,7 @@ testing = ["pytest (>=6)", "pytest-checkdocs (>=2.4)", "flake8 (<5)", "pytest-co
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.8,<3.12"
-content-hash = "310a196ed6b62404370acdbfcae16c1333f574764c20bcd0acc3aee0e3ba743b"
+content-hash = "6244d68e072f7222a92101d05aff7c2ffadc73c2b3afaecd5691ad705d1f79a6"
 
 [metadata.files]
 absl-py = []
@@ -791,10 +765,7 @@ gast = [
     {file = "gast-0.4.0.tar.gz", hash = "sha256:40feb7b8b8434785585ab224d1568b857edb18297e5a3047f1ba012bc83b42c1"},
 ]
 google-auth = []
-google-auth-oauthlib = [
-    {file = "google-auth-oauthlib-0.4.6.tar.gz", hash = "sha256:a90a072f6993f2c327067bf65270046384cda5a8ecb20b94ea9a687f1f233a7a"},
-    {file = "google_auth_oauthlib-0.4.6-py2.py3-none-any.whl", hash = "sha256:3f2a6e802eebbb6fb736a370fbf3b055edcb6b52878bf2f26330b5e041316c73"},
-]
+google-auth-oauthlib = []
 google-pasta = [
     {file = "google-pasta-0.2.0.tar.gz", hash = "sha256:c9f2c8dfc8f96d0d5808299920721be30c9eec37f2389f28904f454565c8a16e"},
     {file = "google_pasta-0.2.0-py2-none-any.whl", hash = "sha256:4612951da876b1a10fe3960d7226f0c7682cf901e16ac06e473b267a5afa8954"},
@@ -808,10 +779,6 @@ iniconfig = []
 itsdangerous = []
 jinja2 = []
 keras = []
-keras-preprocessing = [
-    {file = "Keras_Preprocessing-1.1.2-py2.py3-none-any.whl", hash = "sha256:7b82029b130ff61cc99b55f3bd27427df4838576838c5b2f65940e4fcec99a7b"},
-    {file = "Keras_Preprocessing-1.1.2.tar.gz", hash = "sha256:add82567c50c8bc648c14195bf544a5ce7c1f76761536956c3d2978970179ef3"},
-]
 libclang = []
 markdown = []
 markupsafe = []
@@ -877,14 +844,7 @@ six = [
     {file = "six-1.16.0.tar.gz", hash = "sha256:1e61c37477a1626458e36f7b1d82aa5c9b094fa4802892072e49de9c60c4c926"},
 ]
 tensorboard = []
-tensorboard-data-server = [
-    {file = "tensorboard_data_server-0.6.1-py3-none-any.whl", hash = "sha256:809fe9887682d35c1f7d1f54f0f40f98bb1f771b14265b453ca051e2ce58fca7"},
-    {file = "tensorboard_data_server-0.6.1-py3-none-macosx_10_9_x86_64.whl", hash = "sha256:fa8cef9be4fcae2f2363c88176638baf2da19c5ec90addb49b1cde05c95c88ee"},
-    {file = "tensorboard_data_server-0.6.1-py3-none-manylinux2010_x86_64.whl", hash = "sha256:d8237580755e58eff68d1f3abefb5b1e39ae5c8b127cc40920f9c4fb33f4b98a"},
-]
-tensorboard-plugin-wit = [
-    {file = "tensorboard_plugin_wit-1.8.1-py3-none-any.whl", hash = "sha256:ff26bdd583d155aa951ee3b152b3d0cffae8005dc697f72b44a8e8c2a77a8cbe"},
-]
+tensorboard-data-server = []
 tensorflow = []
 tensorflow-estimator = []
 tensorflow-io-gcs-filesystem = []

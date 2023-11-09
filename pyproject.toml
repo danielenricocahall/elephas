@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "elephas"
-version = "4.1.0"
+version = "5.0.0"
 description = "Distributed deep learning on Spark with Keras"
 readme = "README.md"
 homepage = "https://danielenricocahall.github.io/elephas/"
@@ -8,11 +8,11 @@ authors = ["Daniel Cahall <danielenricocahall@gmail.com>"]
 license = "MIT"
 
 [tool.poetry.dependencies]
-python = ">=3.8,<3.11"
-tensorflow = ">2.2,<=2.10"
+python = ">=3.8,<3.12"
+tensorflow = ">2.2,<=2.14"
 Flask = "^2.2.3"
 h5py = "3.8.0"
-pyspark = "<=3.3"
+pyspark = "<=3.5.0"
 Cython = "^0.29.33"
 numpy = "1.23.5"
 

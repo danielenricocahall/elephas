@@ -1,5 +1,5 @@
 
-from tensorflow.keras.optimizers import RMSprop
+from tensorflow.keras.optimizers.legacy import RMSprop
 
 from elephas.spark_model import SparkMLlibModel, load_spark_model
 from elephas.utils.rdd_utils import to_labeled_point

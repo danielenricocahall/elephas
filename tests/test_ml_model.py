@@ -8,6 +8,7 @@ from pyspark.sql import Column
 from pyspark.sql.types import DoubleType
 import pyspark.sql.functions as F
 from tensorflow.keras import optimizers
+from tensorflow.keras.optimizers.legacy import SGD
 from tensorflow.keras.activations import relu
 from tensorflow.keras.layers import Dense
 from tensorflow.keras.models import Sequential
@@ -65,7 +66,7 @@ def test_spark_ml_model_classification(spark_context, classification_model, mnis
     df = to_data_frame(spark_context, x_train, y_train, categorical=True)
     test_df = to_data_frame(spark_context, x_test, y_test, categorical=True)
 
-    sgd = optimizers.SGD(learning_rate=0.01, decay=1e-6, momentum=0.9, nesterov=True)
+    sgd = SGD(learning_rate=0.01, decay=1e-6, momentum=0.9, nesterov=True)
     sgd_conf = optimizers.serialize(sgd)
 
     # Initialize Spark ML Estimator
@@ -108,7 +109,7 @@ def test_functional_model(spark_context, classification_model_functional, mnist_
     df = to_data_frame(spark_context, x_train, y_train, categorical=True)
     test_df = to_data_frame(spark_context, x_test, y_test, categorical=True)
 
-    sgd = optimizers.SGD()
+    sgd = SGD()
     sgd_conf = optimizers.serialize(sgd)
     estimator = ElephasEstimator()
     estimator.set_keras_model_config(classification_model_functional.to_json())
@@ -141,7 +142,7 @@ def test_regression_model(spark_context, regression_model, boston_housing_datase
     df = to_data_frame(spark_context, x_train, y_train)
     test_df = to_data_frame(spark_context, x_test, y_test)
 
-    sgd = optimizers.SGD(learning_rate=0.00001)
+    sgd = SGD(learning_rate=0.00001)
     sgd_conf = optimizers.serialize(sgd)
     estimator = ElephasEstimator()
     estimator.set_keras_model_config(regression_model.to_json())
@@ -178,7 +179,7 @@ def test_set_cols_deprecated(spark_context, regression_model, boston_housing_dat
         test_df = test_df.withColumnRenamed('features', 'scaled_features')
         test_df = test_df.withColumnRenamed('label', 'ground_truth')
 
-        sgd = optimizers.SGD(learning_rate=0.00001)
+        sgd = SGD(learning_rate=0.00001)
         sgd_conf = optimizers.serialize(sgd)
         estimator = ElephasEstimator()
         estimator.set_keras_model_config(regression_model.to_json())
@@ -217,7 +218,7 @@ def test_set_cols(spark_context, regression_model, boston_housing_dataset):
     test_df = test_df.withColumnRenamed('features', 'scaled_features')
     test_df = test_df.withColumnRenamed('label', 'ground_truth')
 
-    sgd = optimizers.SGD(learning_rate=0.00001)
+    sgd = SGD(learning_rate=0.00001)
     sgd_conf = optimizers.serialize(sgd)
     estimator = ElephasEstimator(labelCol='ground_truth', outputCol='output', featuresCol='scaled_features')
     estimator.set_keras_model_config(regression_model.to_json())
@@ -253,7 +254,7 @@ def test_custom_objects(spark_context, boston_housing_dataset):
     df = to_data_frame(spark_context, x_train, y_train)
     test_df = to_data_frame(spark_context, x_test, y_test)
 
-    sgd = optimizers.SGD(learning_rate=0.00001)
+    sgd = SGD(learning_rate=0.00001)
     sgd_conf = optimizers.serialize(sgd)
     estimator = ElephasEstimator()
     estimator.set_keras_model_config(model.to_json())
@@ -283,7 +284,7 @@ def test_predict_classes_probability(spark_context, classification_model, mnist_
     df = to_data_frame(spark_context, x_train, y_train, categorical=True)
     test_df = to_data_frame(spark_context, x_test, y_test, categorical=True)
 
-    sgd = optimizers.SGD(learning_rate=0.01, decay=1e-6, momentum=0.9, nesterov=True)
+    sgd = SGD(learning_rate=0.01, decay=1e-6, momentum=0.9, nesterov=True)
     sgd_conf = optimizers.serialize(sgd)
 
     # Initialize Spark ML Estimator
@@ -320,7 +321,7 @@ def test_batch_predict_classes_probability(spark_context, classification_model, 
     df = to_data_frame(spark_context, x_train, y_train, categorical=True)
     test_df = to_data_frame(spark_context, x_test, y_test, categorical=True)
 
-    sgd = optimizers.SGD(learning_rate=0.01, decay=1e-6, momentum=0.9, nesterov=True)
+    sgd = SGD(learning_rate=0.01, decay=1e-6, momentum=0.9, nesterov=True)
     sgd_conf = optimizers.serialize(sgd)
 
     # Initialize Spark ML Estimator
@@ -355,7 +356,7 @@ def test_batch_predict_classes_probability(spark_context, classification_model, 
 
 
 def test_save_pipeline(spark_context, classification_model):
-    sgd = optimizers.SGD(learning_rate=0.01, decay=1e-6, momentum=0.9, nesterov=True)
+    sgd = SGD(learning_rate=0.01, decay=1e-6, momentum=0.9, nesterov=True)
     sgd_conf = optimizers.serialize(sgd)
 
     # Initialize Spark ML Estimator

@@ -1,7 +1,7 @@
 from itertools import count
 from math import isclose
 
-from tensorflow.keras.optimizers import SGD
+from tensorflow.keras.optimizers.legacy import SGD
 
 from elephas.spark_model import SparkModel
 from elephas.utils.rdd_utils import to_simple_rdd

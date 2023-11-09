@@ -5,7 +5,7 @@ import pytest
 from tensorflow.keras.backend import sigmoid
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense
-from tensorflow.keras.optimizers import SGD
+from tensorflow.keras.optimizers.legacy import SGD
 
 from elephas.spark_model import SparkModel
 from elephas.utils import to_simple_rdd
