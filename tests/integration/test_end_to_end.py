@@ -10,9 +10,6 @@ import pytest
 import numpy as np
 
 
-def _generate_port_number(port=3000, _count=count(1)):
-    return port + next(_count)
-
 # enumerate possible combinations for training mode and parameter server for a classification model while also
 # validatiing multiple workers for repartitioning
 @pytest.mark.parametrize('mode,parameter_server_mode,num_workers',
@@ -44,7 +41,7 @@ def test_training_classification(spark_context, mode, parameter_server_mode, num
 
     # Initialize SparkModel from keras model and Spark context
     spark_model = SparkModel(classification_model, frequency='epoch', num_workers=num_workers,
-                             mode=mode, parameter_server_mode=parameter_server_mode, port=_generate_port_number())
+                             mode=mode, parameter_server_mode=parameter_server_mode, port=0)
 
     # Train Spark model
     spark_model.fit(rdd, epochs=epochs, batch_size=batch_size,
@@ -91,7 +88,7 @@ def test_training_regression(spark_context, mode, parameter_server_mode, num_wor
     sgd = SGD(lr=0.0000001)
     regression_model.compile(sgd, 'mse', ['mae', 'mean_absolute_percentage_error'])
     spark_model = SparkModel(regression_model, frequency='epoch', mode=mode, num_workers=num_workers,
-                             parameter_server_mode=parameter_server_mode, port=_generate_port_number())
+                             parameter_server_mode=parameter_server_mode, port=0)
 
     # Train Spark model
     spark_model.fit(rdd, epochs=epochs, batch_size=batch_size,
@@ -124,7 +121,7 @@ def test_training_regression_no_metrics(spark_context, boston_housing_dataset, r
     epochs = 1
     sgd = SGD(lr=0.0000001)
     regression_model.compile(sgd, 'mse')
-    spark_model = SparkModel(regression_model, frequency='epoch', mode='synchronous', port=_generate_port_number())
+    spark_model = SparkModel(regression_model, frequency='epoch', mode='synchronous', port=0)
 
     # Train Spark model
     spark_model.fit(rdd, epochs=epochs, batch_size=batch_size, verbose=0, validation_split=0.1)
