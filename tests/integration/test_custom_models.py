@@ -7,11 +7,12 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense
 from tensorflow.keras.optimizers.legacy import SGD
 
+from elephas.enums.modes import Mode
 from elephas.spark_model import SparkModel
 from elephas.utils import to_simple_rdd
 
 
-@pytest.mark.parametrize('mode', ['synchronous', 'asynchronous', 'hogwild'])
+@pytest.mark.parametrize('mode', [mode for mode in Mode])
 def test_training_custom_activation(mode, spark_context):
     def custom_activation(x):
         return sigmoid(x) + 1

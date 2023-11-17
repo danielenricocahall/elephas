@@ -3,6 +3,7 @@ from math import isclose
 
 from tensorflow.keras.optimizers.legacy import SGD
 
+from elephas.enums.modes import Mode
 from elephas.spark_model import SparkModel
 from elephas.utils.rdd_utils import to_simple_rdd
 
@@ -16,16 +17,16 @@ def _generate_port_number(port=3000, _count=count(1)):
 # enumerate possible combinations for training mode and parameter server for a classification model while also
 # validatiing multiple workers for repartitioning
 @pytest.mark.parametrize('mode,parameter_server_mode,num_workers',
-                         [('synchronous', None, None),
-                          ('synchronous', None, 2),
-                          ('asynchronous', 'http', None),
-                          ('asynchronous', 'http', 2),
-                          ('asynchronous', 'socket', None),
-                          ('asynchronous', 'socket', 2),
-                          ('hogwild', 'http', None),
-                          ('hogwild', 'http', 2),
-                          ('hogwild', 'socket', None),
-                          ('hogwild', 'socket', 2)])
+                         [(Mode.SYNCHRONOUS, None, None),
+                          (Mode.SYNCHRONOUS, None, 2),
+                          (Mode.ASYNCHRONOUS, 'http', None),
+                          (Mode.ASYNCHRONOUS, 'http', 2),
+                          (Mode.ASYNCHRONOUS, 'socket', None),
+                          (Mode.ASYNCHRONOUS, 'socket', 2),
+                          (Mode.HOGWILD, 'http', None),
+                          (Mode.HOGWILD, 'http', 2),
+                          (Mode.HOGWILD, 'socket', None),
+                          (Mode.HOGWILD, 'socket', 2)])
 def test_training_classification(spark_context, mode, parameter_server_mode, num_workers, mnist_data, classification_model):
     # Define basic parameters
     batch_size = 64
@@ -70,16 +71,16 @@ def test_training_classification(spark_context, mode, parameter_server_mode, num
 # enumerate possible combinations for training mode and parameter server for a regression model while also validating
 # multiple workers for repartitioning
 @pytest.mark.parametrize('mode,parameter_server_mode,num_workers',
-                         [('synchronous', None, None),
-                          ('synchronous', None, 2),
-                          ('asynchronous', 'http', None),
-                          ('asynchronous', 'http', 2),
-                          ('asynchronous', 'socket', None),
-                          ('asynchronous', 'socket', 2),
-                          ('hogwild', 'http', None),
-                          ('hogwild', 'http', 2),
-                          ('hogwild', 'socket', None),
-                          ('hogwild', 'socket', 2)])
+                         [(Mode.SYNCHRONOUS, None, None),
+                          (Mode.SYNCHRONOUS, None, 2),
+                          (Mode.ASYNCHRONOUS, 'http', None),
+                          (Mode.ASYNCHRONOUS, 'http', 2),
+                          (Mode.ASYNCHRONOUS, 'socket', None),
+                          (Mode.ASYNCHRONOUS, 'socket', 2),
+                          (Mode.HOGWILD, 'http', None),
+                          (Mode.HOGWILD, 'http', 2),
+                          (Mode.HOGWILD, 'socket', None),
+                          (Mode.HOGWILD, 'socket', 2)])
 def test_training_regression(spark_context, mode, parameter_server_mode, num_workers, boston_housing_dataset,
                              regression_model):
     x_train, y_train, x_test, y_test = boston_housing_dataset
@@ -124,7 +125,7 @@ def test_training_regression_no_metrics(spark_context, boston_housing_dataset, r
     epochs = 1
     sgd = SGD(lr=0.0000001)
     regression_model.compile(sgd, 'mse')
-    spark_model = SparkModel(regression_model, frequency='epoch', mode='synchronous', port=_generate_port_number())
+    spark_model = SparkModel(regression_model, frequency='epoch', mode=Mode.SYNCHRONOUS, port=_generate_port_number())
 
     # Train Spark model
     spark_model.fit(rdd, epochs=epochs, batch_size=batch_size, verbose=0, validation_split=0.1)

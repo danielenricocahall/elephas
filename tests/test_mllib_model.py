@@ -1,6 +1,7 @@
 
 from tensorflow.keras.optimizers.legacy import RMSprop
 
+from elephas.enums.modes import Mode
 from elephas.spark_model import SparkMLlibModel, load_spark_model
 from elephas.utils.rdd_utils import to_labeled_point
 
@@ -16,7 +17,7 @@ def test_serialization(classification_model):
     rms = RMSprop()
     classification_model.compile(rms, 'categorical_crossentropy', ['acc'])
     spark_model = SparkMLlibModel(
-        classification_model, frequency='epoch', mode='synchronous', num_workers=2)
+        classification_model, frequency='epoch', mode=Mode.SYNCHRONOUS, num_workers=2)
     spark_model.save("test.h5")
     loaded_model = load_spark_model("test.h5")
     assert loaded_model.master_network.to_json()
@@ -34,7 +35,7 @@ def test_mllib_model(spark_context, classification_model, mnist_data):
 
     # Initialize SparkModel from tensorflow.keras model and Spark context
     spark_model = SparkMLlibModel(
-        model=classification_model, frequency='epoch', mode='synchronous')
+        model=classification_model, frequency='epoch', mode=Mode.SYNCHRONOUS)
 
     # Train Spark model
     spark_model.fit(lp_rdd, epochs=5, batch_size=32, verbose=0,

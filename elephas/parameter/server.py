@@ -7,6 +7,7 @@ from flask import Flask, request
 from multiprocessing import Process
 from tensorflow.keras.models import Model
 
+from elephas.enums.modes import Mode
 from elephas.utils.sockets import determine_master
 from elephas.utils.sockets import receive, send
 from elephas.utils.serialization import dict_to_model
@@ -44,7 +45,7 @@ class BaseParameterServer(abc.ABC):
         return self.make_threadsafe_if_necessary(func, self.lock.acquire_write)
 
     def make_threadsafe_if_necessary(self, func, lock_aquire_callable):
-        if self.mode == 'asynchronous':
+        if self.mode == Mode.ASYNCHRONOUS:
             @wraps(func)
             def wrapper(*args, **kwargs):
                 lock_aquire_callable()
