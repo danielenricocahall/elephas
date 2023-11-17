@@ -1,6 +1,7 @@
 import abc
 import pickle
 import socket
+from functools import wraps
 from threading import Thread
 from flask import Flask, request
 from multiprocessing import Process
@@ -14,7 +15,7 @@ from elephas.utils.notebook_utils import is_running_in_notebook
 from elephas.utils import subtract_params
 
 
-class BaseParameterServer(object):
+class BaseParameterServer(abc.ABC):
     """BaseParameterServer
 
     Parameter servers can be started and stopped. Server implementations have
@@ -25,18 +26,34 @@ class BaseParameterServer(object):
         self.port = port
         self.mode = mode
         self.master_network = dict_to_model(model, kwargs.get('custom_objects'))
+        self.lock = Lock()
 
     @abc.abstractmethod
     def start(self):
         """Start the parameter server instance.
         """
-        raise NotImplementedError
 
     @abc.abstractmethod
     def stop(self):
         """Terminate the parameter server instance.
         """
-        raise NotImplementedError
+    def make_read_threadsafe_if_necessary(self, func):
+        return self.make_threadsafe_if_necessary(func, self.lock.acquire_read)
+
+    def make_write_threadsafe_if_necessary(self, func):
+        return self.make_threadsafe_if_necessary(func, self.lock.acquire_write)
+
+    def make_threadsafe_if_necessary(self, func, lock_aquire_callable):
+        if self.mode == 'asynchronous':
+            @wraps(func)
+            def wrapper(*args, **kwargs):
+                lock_aquire_callable()
+                result = func(*args, **kwargs)
+                self.lock.release()
+                return result
+            return wrapper
+        else:
+            return func
 
 
 class HttpServer(BaseParameterServer):
@@ -73,7 +90,6 @@ class HttpServer(BaseParameterServer):
             self.threaded = kwargs.get("threaded", True)
             self.use_reloader = kwargs.get("use_reloader", False)
 
-        self.lock = Lock()
         self.pickled_weights = None
         self.weights = self.master_network.get_weights()
 
@@ -105,20 +121,16 @@ class HttpServer(BaseParameterServer):
             return 'Elephas'
 
         @app.route('/parameters', methods=['GET'])
+        @self.make_read_threadsafe_if_necessary
         def handle_get_parameters():
-            if self.mode == 'asynchronous':
-                self.lock.acquire_read()
             self.pickled_weights = pickle.dumps(self.weights, -1)
             pickled_weights = self.pickled_weights
-            if self.mode == 'asynchronous':
-                self.lock.release()
             return pickled_weights
 
         @app.route('/update', methods=['POST'])
+        @self.make_write_threadsafe_if_necessary
         def handle_update_parameters():
             delta = pickle.loads(request.data)
-            if self.mode == 'asynchronous':
-                self.lock.acquire_write()
 
             if not self.master_network.built:
                 self.master_network.build()
@@ -126,9 +138,6 @@ class HttpServer(BaseParameterServer):
             # Just apply the gradient
             weights_before = self.weights
             self.weights = subtract_params(weights_before, delta)
-
-            if self.mode == 'asynchronous':
-                self.lock.release()
             return 'Update done'
 
         master_url = determine_master(self.port)
@@ -158,6 +167,8 @@ class SocketServer(BaseParameterServer):
         self.connections = []
         self.lock = Lock()
         self.thread = None
+        self.update_parameters = self.make_write_threadsafe_if_necessary(self.update_parameters)
+        self.get_parameters = self.make_read_threadsafe_if_necessary(self.get_parameters)
 
     def start(self):
         if self.thread is not None:
@@ -202,20 +213,12 @@ class SocketServer(BaseParameterServer):
         data = receive(conn)
         delta = data['delta']
         weights = self.master_network.get_weights()
-        if self.mode == 'asynchronous':
-            self.lock.acquire_write()
         # apply the gradient
         self.master_network.set_weights(subtract_params(weights, delta))
-        if self.mode == 'asynchronous':
-            self.lock.release()
 
     def get_parameters(self, conn):
-        if self.mode == 'asynchronous':
-            self.lock.acquire_read()
         weights = self.master_network.get_weights()
         send(conn, weights)
-        if self.mode == 'asynchronous':
-            self.lock.release()
 
     def action_listener(self, conn):
         while self.runs:
