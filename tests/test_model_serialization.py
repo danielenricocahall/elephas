@@ -3,13 +3,14 @@ import pytest
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Dense, Input
 
+from elephas.enums.modes import Mode
 from elephas.spark_model import SparkModel
 
 
 def test_sequential_serialization(spark_context, classification_model):
     classification_model.compile(
         optimizer="sgd", loss="categorical_crossentropy", metrics=["acc"])
-    spark_model = SparkModel(classification_model, frequency='epoch', mode='synchronous')
+    spark_model = SparkModel(classification_model, frequency='epoch', mode=Mode.SYNCHRONOUS)
     spark_model.save("elephas_sequential.h5")
 
 

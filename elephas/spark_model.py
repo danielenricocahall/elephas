@@ -17,6 +17,7 @@ from tensorflow.keras.models import model_from_json
 from tensorflow.keras.optimizers import get as get_optimizer
 from tensorflow.keras.optimizers import serialize as serialize_optimizer, deserialize as deserialize_optimizer
 
+from .enums.modes import Mode
 from .mllib import to_matrix, from_matrix, to_vector, from_vector
 from .parameter.factory import ClientServerFactory
 from .utils import lp_to_simple_rdd, to_simple_rdd
@@ -27,7 +28,7 @@ from .worker import AsynchronousSparkWorker, SparkWorker
 
 class SparkModel:
 
-    def __init__(self, model, mode='asynchronous', frequency='epoch', parameter_server_mode='http', num_workers=None,
+    def __init__(self, model, mode=Mode.ASYNCHRONOUS, frequency='epoch', parameter_server_mode='http', num_workers=None,
                  custom_objects=None, batch_size=32, port=4000, *args, **kwargs):
         """SparkModel
 
@@ -72,7 +73,7 @@ class SparkModel:
         self.kwargs = kwargs
 
         self.serialized_model = model_to_dict(model)
-        if self.mode != 'synchronous':
+        if self.mode != Mode.SYNCHRONOUS:
             factory = ClientServerFactory.get_factory(self.parameter_server_mode)
             self.parameter_server = factory.create_server(self.serialized_model, self.port, self.mode,
                                                           custom_objects=self.custom_objects)
@@ -182,7 +183,7 @@ class SparkModel:
         if self.num_workers:
             rdd = rdd.repartition(self.num_workers)
 
-        if self.mode in ['asynchronous', 'synchronous', 'hogwild']:
+        if self.mode in [mode for mode in Mode]:
             self._fit(rdd, **kwargs)
         else:
             raise ValueError(
@@ -193,7 +194,7 @@ class SparkModel:
         self._master_network.compile(optimizer=get_optimizer(self.master_optimizer),
                                      loss=self.master_loss,
                                      metrics=self.master_metrics)
-        if self.mode in ['asynchronous', 'hogwild']:
+        if self.mode in [Mode.ASYNCHRONOUS, Mode.HOGWILD]:
             self.start_server()
         train_config = kwargs
         freq = self.frequency
@@ -206,7 +207,7 @@ class SparkModel:
         init = self._master_network.get_weights()
         parameters = rdd.context.broadcast(init)
 
-        if self.mode in ['asynchronous', 'hogwild']:
+        if self.mode in [Mode.ASYNCHRONOUS, Mode.HOGWILD]:
             print('>>> Initialize workers')
             worker = AsynchronousSparkWorker(
                 model_json, parameters, self.client, train_config, freq, optimizer, loss, metrics, custom)
@@ -214,7 +215,7 @@ class SparkModel:
             rdd.mapPartitions(worker.train).collect()
             print('>>> Async training complete.')
             new_parameters = self.client.get_parameters()
-        elif self.mode == 'synchronous':
+        elif self.mode == Mode.SYNCHRONOUS:
             worker = SparkWorker(model_json, parameters, train_config,
                                  optimizer, loss, metrics, custom)
             training_outcomes = rdd.mapPartitions(worker.train).collect()
@@ -229,7 +230,7 @@ class SparkModel:
         else:
             raise ValueError("Unsupported mode {}".format(self.mode))
         self._master_network.set_weights(new_parameters)
-        if self.mode in ['asynchronous', 'hogwild']:
+        if self.mode in [Mode.ASYNCHRONOUS, Mode.HOGWILD]:
             self.stop_server()
 
     def _predict(self, rdd: RDD) -> List[np.ndarray]:
@@ -310,7 +311,7 @@ class SparkModel:
 
 class SparkMLlibModel(SparkModel):
 
-    def __init__(self, model, mode='asynchronous', frequency='epoch', parameter_server_mode='http',
+    def __init__(self, model, mode=Mode.ASYNCHRONOUS, frequency='epoch', parameter_server_mode='http',
                  num_workers=4, elephas_optimizer=None, custom_objects=None, batch_size=32, port=4000, *args, **kwargs):
         """SparkMLlibModel
 
