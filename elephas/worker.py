@@ -13,6 +13,13 @@ def is_multiple_input_model(model):
     """
     return isinstance(model.input_shape, list)
 
+
+def is_multiple_output_model(model):
+    """Check if a model has multiple outputs
+    """
+    return isinstance(model.output_shape, list)
+
+
 class SparkWorker(object):
     """Synchronous Spark worker. This code will be executed on workers.
     """
@@ -43,7 +50,8 @@ class SparkWorker(object):
         y_train = np.asarray([y for x, y in label_iterator])
         if is_multiple_input_model(self.model):
             x_train = np.hsplit(x_train, len(self.model.input_shape))
-
+        if is_multiple_output_model(self.model):
+            y_train = np.hsplit(y_train, len(self.model.output_shape))
         weights_before_training = self.model.get_weights()
         if x_train.shape[0] > self.train_config.get('batch_size'):
             history = self.model.fit(x_train, y_train, **self.train_config)
@@ -95,6 +103,8 @@ class AsynchronousSparkWorker(object):
         self.model = model_from_json(self.json, self.custom_objects)
         if is_multiple_input_model(self.model):
             x_train = np.hsplit(x_train, len(self.model.input_shape))
+        if is_multiple_output_model(self.model):
+            y_train = np.hsplit(y_train, len(self.model.output_shape))
         self.model.compile(optimizer=get_optimizer(self.master_optimizer),
                            loss=self.master_loss, metrics=self.master_metrics)
         self.model.set_weights(self.parameters.value)
