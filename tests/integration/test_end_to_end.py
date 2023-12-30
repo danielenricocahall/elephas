@@ -1,3 +1,4 @@
+import os
 from itertools import count
 from math import isclose
 
@@ -150,7 +151,9 @@ def test_multiple_input_model(spark_session, frequency):
         return [row.user_id_encoded, row.track_id_encoded], row.frequency
 
     # Read and preprocess data
-    df = spark_session.read.csv('sample_data.csv', header=True, inferSchema=True)
+    current_dir = os.path.dirname(__file__)
+    parent_dir = os.path.dirname(current_dir)
+    df = spark_session.read.csv(f'{parent_dir}/data/sample_data.csv', header=True, inferSchema=True)
     df = df.limit(100)
 
     indexer_user = StringIndexer(inputCol="user_id", outputCol="user_id_encoded")
