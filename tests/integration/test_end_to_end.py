@@ -18,20 +18,24 @@ import numpy as np
 def _generate_port_number(port=3000, _count=count(1)):
     return port + next(_count)
 
+
+COMBINATIONS = [(Mode.SYNCHRONOUS, None, None),
+                (Mode.SYNCHRONOUS, None, 2),
+                (Mode.ASYNCHRONOUS, 'http', None),
+                (Mode.ASYNCHRONOUS, 'http', 2),
+                (Mode.ASYNCHRONOUS, 'socket', None),
+                (Mode.ASYNCHRONOUS, 'socket', 2),
+                (Mode.HOGWILD, 'http', None),
+                (Mode.HOGWILD, 'http', 2),
+                (Mode.HOGWILD, 'socket', None),
+                (Mode.HOGWILD, 'socket', 2)]
+
+
 # enumerate possible combinations for training mode and parameter server for a classification model while also
 # validatiing multiple workers for repartitioning
-@pytest.mark.parametrize('mode,parameter_server_mode,num_workers',
-                         [(Mode.SYNCHRONOUS, None, None),
-                          (Mode.SYNCHRONOUS, None, 2),
-                          (Mode.ASYNCHRONOUS, 'http', None),
-                          (Mode.ASYNCHRONOUS, 'http', 2),
-                          (Mode.ASYNCHRONOUS, 'socket', None),
-                          (Mode.ASYNCHRONOUS, 'socket', 2),
-                          (Mode.HOGWILD, 'http', None),
-                          (Mode.HOGWILD, 'http', 2),
-                          (Mode.HOGWILD, 'socket', None),
-                          (Mode.HOGWILD, 'socket', 2)])
-def test_training_classification(spark_context, mode, parameter_server_mode, num_workers, mnist_data, classification_model):
+@pytest.mark.parametrize('mode,parameter_server_mode,num_workers', COMBINATIONS)
+def test_training_classification(spark_context, mode, parameter_server_mode, num_workers, mnist_data,
+                                 classification_model):
     # Define basic parameters
     batch_size = 64
     epochs = 10
@@ -74,17 +78,7 @@ def test_training_classification(spark_context, mode, parameter_server_mode, num
 
 # enumerate possible combinations for training mode and parameter server for a regression model while also validating
 # multiple workers for repartitioning
-@pytest.mark.parametrize('mode,parameter_server_mode,num_workers',
-                         [(Mode.SYNCHRONOUS, None, None),
-                          (Mode.SYNCHRONOUS, None, 2),
-                          (Mode.ASYNCHRONOUS, 'http', None),
-                          (Mode.ASYNCHRONOUS, 'http', 2),
-                          (Mode.ASYNCHRONOUS, 'socket', None),
-                          (Mode.ASYNCHRONOUS, 'socket', 2),
-                          (Mode.HOGWILD, 'http', None),
-                          (Mode.HOGWILD, 'http', 2),
-                          (Mode.HOGWILD, 'socket', None),
-                          (Mode.HOGWILD, 'socket', 2)])
+@pytest.mark.parametrize('mode,parameter_server_mode,num_workers', COMBINATIONS)
 def test_training_regression(spark_context, mode, parameter_server_mode, num_workers, boston_housing_dataset,
                              regression_model):
     x_train, y_train, x_test, y_test = boston_housing_dataset
@@ -149,10 +143,10 @@ def test_training_regression_no_metrics(spark_context, boston_housing_dataset, r
                    spark_model.master_network.evaluate(x_test, y_test), abs_tol=0.01)
 
 
-def test_multiple_input_model(spark_session):
-
+@pytest.mark.parametrize('frequency', ['epoch', 'batch'])
+def test_multiple_input_model(spark_session, frequency):
     def row_to_tuple(row):
-        return ([row.user_id_encoded, row.track_id_encoded], row.frequency)
+        return [row.user_id_encoded, row.track_id_encoded], row.frequency
 
     # Read and preprocess data
     df = spark_session.read.csv('sample_data.csv', header=True, inferSchema=True)
@@ -183,5 +177,5 @@ def test_multiple_input_model(spark_session):
 
     rdd_final = df_transformed.rdd.map(row_to_tuple)
 
-    spark_model = SparkModel(model, frequency='epoch', mode='asynchronous')
+    spark_model = SparkModel(model, frequency=frequency, mode=Mode.ASYNCHRONOUS, port=_generate_port_number())
     spark_model.fit(rdd_final, epochs=5, batch_size=32, verbose=0, validation_split=0.1)
