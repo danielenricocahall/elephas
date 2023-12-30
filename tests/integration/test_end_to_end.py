@@ -129,7 +129,7 @@ def test_training_regression_no_metrics(spark_context, boston_housing_dataset, r
     epochs = 1
     sgd = SGD(lr=0.0000001)
     regression_model.compile(sgd, 'mse')
-    spark_model = SparkModel(regression_model, frequency='epoch', mode=Mode.ASYNCHRONOUS, port=_generate_port_number())
+    spark_model = SparkModel(regression_model, frequency='epoch', mode=Mode.SYNCHRONOUS, port=_generate_port_number())
 
     # Train Spark model
     spark_model.fit(rdd, epochs=epochs, batch_size=batch_size, verbose=0, validation_split=0.1)
