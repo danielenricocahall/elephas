@@ -93,8 +93,8 @@ class AsynchronousSparkWorker(object):
         nb_train_sample = x_train.shape[0]
 
         self.model = model_from_json(self.json, self.custom_objects)
-        #if is_multiple_input_model(self.model):
-        #    x_train = np.hsplit(x_train, len(self.model.input_shape))
+        if is_multiple_input_model(self.model):
+            x_train = np.hsplit(x_train, len(self.model.input_shape))
         self.model.compile(optimizer=get_optimizer(self.master_optimizer),
                            loss=self.master_loss, metrics=self.master_metrics)
         self.model.set_weights(self.parameters.value)
