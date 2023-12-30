@@ -4,6 +4,7 @@ from tensorflow.keras.models import model_from_json
 from tensorflow.keras.optimizers import get as get_optimizer
 from tensorflow.python.keras.utils.generic_utils import slice_arrays
 
+from .enums.frequency import Frequency
 from .utils import subtract_params
 from .parameter import BaseParameterClient
 
@@ -118,7 +119,7 @@ class AsynchronousSparkWorker(object):
             for i in range(0, nb_batch)
         ]
 
-        if self.frequency == 'epoch':
+        if self.frequency == Frequency.EPOCH:
             for epoch in range(epochs):
                 weights_before_training = self.client.get_parameters()
                 self.model.set_weights(weights_before_training)
@@ -130,7 +131,7 @@ class AsynchronousSparkWorker(object):
                 deltas = subtract_params(
                     weights_before_training, weights_after_training)
                 self.client.update_parameters(deltas)
-        elif self.frequency == 'batch':
+        elif self.frequency == Frequency.BATCH:
             for epoch in range(epochs):
                 if nb_train_sample > batch_size:
                     for (batch_start, batch_end) in batches:

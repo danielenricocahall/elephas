@@ -8,6 +8,7 @@ from tensorflow.keras import Input
 from tensorflow.keras.layers import Embedding, Flatten, Dot
 
 from elephas.enums.modes import Mode
+from elephas.enums.frequency import Frequency
 from elephas.spark_model import SparkModel
 from elephas.utils.rdd_utils import to_simple_rdd
 
@@ -143,7 +144,7 @@ def test_training_regression_no_metrics(spark_context, boston_housing_dataset, r
                    spark_model.master_network.evaluate(x_test, y_test), abs_tol=0.01)
 
 
-@pytest.mark.parametrize('frequency', ['epoch', 'batch'])
+@pytest.mark.parametrize('frequency', [Frequency.EPOCH, Frequency.BATCH])
 def test_multiple_input_model(spark_session, frequency):
     def row_to_tuple(row):
         return [row.user_id_encoded, row.track_id_encoded], row.frequency
