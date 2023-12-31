@@ -1,6 +1,5 @@
 import os
 import socket
-from itertools import count
 from math import isclose
 
 from keras import Model
