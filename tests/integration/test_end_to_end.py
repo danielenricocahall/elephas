@@ -1,4 +1,5 @@
 import os
+import socket
 from itertools import count
 from math import isclose
 
@@ -17,8 +18,15 @@ import pytest
 import numpy as np
 
 
-def _generate_port_number(port=3000, _count=count(1)):
-    return port + next(_count)
+def _generate_port_number(start_port=50000, end_port=60000):
+    for port in range(start_port, end_port):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            try:
+                s.bind(("", port))
+                return port
+            except OSError:
+                continue
+    raise RuntimeError("No available ports in the range.")
 
 
 COMBINATIONS = [(Mode.SYNCHRONOUS, None, None),
