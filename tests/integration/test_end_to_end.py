@@ -1,6 +1,5 @@
 from itertools import count
 from math import isclose
-
 from tensorflow.keras.optimizers.legacy import SGD
 
 from elephas.enums.modes import Mode
@@ -9,6 +8,9 @@ from elephas.utils.rdd_utils import to_simple_rdd
 
 import pytest
 import numpy as np
+import tensorflow as tf
+
+from elephas.utils.versioning_utils import get_minor_version
 
 
 def _generate_port_number(port=3000, _count=count(1)):
@@ -145,4 +147,25 @@ def test_training_regression_no_metrics(spark_context, boston_housing_dataset, r
                    spark_model.master_network.evaluate(x_test, y_test), abs_tol=0.01)
 
 
+@pytest.mark.skipif(get_minor_version(tf.__version__) < 13, reason="This test only applies to Tensorflow 2.13+")
+def test_exception_raised_if_not_legacy_optimizer_in_tf_13(spark_context, boston_housing_dataset, regression_model):
+
+    # import SGD not from legacy - this cannot be serialized correctly so we try to catch that in advance
+    from tensorflow.keras.optimizers import SGD
+
+    x_train, y_train, x_test, y_test = boston_housing_dataset
+    rdd = to_simple_rdd(spark_context, x_train, y_train)
+
+    # Define basic parameters
+    batch_size = 64
+    epochs = 10
+    sgd = SGD(lr=0.0000001)
+    regression_model.compile(sgd, 'mse', ['mae', 'mean_absolute_percentage_error'])
+    spark_model = SparkModel(regression_model, frequency='epoch', mode=Mode.SYNCHRONOUS,
+                             parameter_server_mode="http", port=_generate_port_number())
+
+    with pytest.raises(ValueError):
+        # Train Spark model
+        spark_model.fit(rdd, epochs=epochs, batch_size=batch_size,
+                        verbose=0, validation_split=0.1)
 
