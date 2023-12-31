@@ -23,6 +23,20 @@ class SparkWorker(object):
         self.custom_objects = custom_objects
         self.model = None
 
+    @property
+    def master_optimizer(self):
+        return self._master_optimizer
+
+    @master_optimizer.setter
+    def master_optimizer(self, optimizer):
+        from tensorflow.keras.optimizers.legacy import Optimizer as LegacyOptimizer
+        if isinstance(optimizer, LegacyOptimizer):
+            self._master_optimizer = optimizer
+        else:
+            raise ValueError(f"Optimizer {optimizer} needs to be a legacy optimizer - subclass of "
+                             f"tensorflow.keras.optimizers.legacy.Optimizer. Currently, non-legacy optimizers ("
+                             f"subclasses of tensorflow.keras.optimizers) are not supported.")
+
     def train(self, data_iterator):
         """Train a keras model on a worker
         """
