@@ -182,3 +182,7 @@ def test_multiple_input_model(spark_session, frequency):
 
     spark_model = SparkModel(model, frequency=frequency, mode=Mode.ASYNCHRONOUS, port=_generate_port_number())
     spark_model.fit(rdd_final, epochs=5, batch_size=32, verbose=0, validation_split=0.1)
+    rdd_test_data = rdd_final.map(lambda x: x[0])
+    rdd_test_targets = rdd_final.map(lambda x: x[1])
+    assert spark_model.predict(rdd_test_data)
+    assert spark_model.evaluate(np.array(rdd_test_data.collect()), np.array(rdd_test_targets.collect()))
