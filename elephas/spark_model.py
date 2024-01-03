@@ -23,6 +23,7 @@ from .parameter.factory import ClientServerFactory
 from .utils import lp_to_simple_rdd, to_simple_rdd
 from .utils import model_to_dict
 from .utils import subtract_params, divide_by
+from .utils.model_utils import is_multiple_input_model, is_multiple_output_model
 from .worker import AsynchronousSparkWorker, SparkWorker
 
 
@@ -246,6 +247,8 @@ class SparkModel:
             model = model_from_json(model_as_json, custom_objects)
             model.set_weights(weights.value)
             data = np.array([x for x in data])
+            if is_multiple_input_model(model):
+                data = np.hsplit(data, len(model.input_shape))
             return model.predict(data)
 
         def _predict_with_indices(model_as_json: str, custom_objects: Dict[str, Any], data):
@@ -253,6 +256,8 @@ class SparkModel:
             model.set_weights(weights.value)
             data, indices = zip(*data)
             data = np.array(data)
+            if is_multiple_input_model(model):
+                data = np.hsplit(data, len(model.input_shape))
             return zip(model.predict(data), indices)
 
         if self.num_workers and self.num_workers > 1:
@@ -289,6 +294,10 @@ class SparkModel:
             feature_iterator, label_iterator = tee(data_iterator, 2)
             x_test = np.asarray([x for x, y in feature_iterator])
             y_test = np.asarray([y for x, y in label_iterator])
+            if is_multiple_input_model(model):
+                x_test = np.hsplit(x_test, len(model.input_shape))
+            if is_multiple_output_model(model):
+                y_test = np.hsplit(y_test, len(model.output_shape))
             evaluation_results = model.evaluate(x_test, y_test, **kwargs)
             evaluation_results = [evaluation_results] if not isinstance(evaluation_results, list) \
                 else evaluation_results

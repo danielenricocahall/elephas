@@ -1,9 +1,5 @@
 import json
 from enum import Enum
-from typing import Union
-
-from pyspark.sql import Column
-import pyspark.sql.functions as F
 
 
 class ModelType(Enum):
@@ -68,3 +64,15 @@ def as_enum(d):
         return getattr(ModelType, member)
     else:
         return d
+
+
+def is_multiple_input_model(model) -> bool:
+    """Check if a model has multiple inputs
+    """
+    return isinstance(model.input_shape, list)
+
+
+def is_multiple_output_model(model) -> bool:
+    """Check if a model has multiple outputs
+    """
+    return isinstance(model.output_shape, list)

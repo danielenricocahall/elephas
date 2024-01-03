@@ -7,18 +7,7 @@ from tensorflow.python.keras.utils.generic_utils import slice_arrays
 from .enums.frequency import Frequency
 from .utils import subtract_params
 from .parameter import BaseParameterClient
-
-
-def is_multiple_input_model(model):
-    """Check if a model has multiple inputs
-    """
-    return isinstance(model.input_shape, list)
-
-
-def is_multiple_output_model(model):
-    """Check if a model has multiple outputs
-    """
-    return isinstance(model.output_shape, list)
+from .utils.model_utils import is_multiple_input_model, is_multiple_output_model
 
 
 class SparkWorker(object):
