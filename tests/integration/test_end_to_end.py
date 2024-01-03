@@ -1,8 +1,14 @@
+import os
 from itertools import count
 from math import isclose
+from keras import Model
+from pyspark.ml.feature import StringIndexer, VectorAssembler
 from tensorflow.keras.optimizers.legacy import SGD
+from tensorflow.keras import Input
+from tensorflow.keras.layers import Embedding, Flatten, Dot
 
 from elephas.enums.modes import Mode
+from elephas.enums.frequency import Frequency
 from elephas.spark_model import SparkModel
 from elephas.utils.rdd_utils import to_simple_rdd
 
@@ -16,20 +22,24 @@ from elephas.utils.versioning_utils import get_minor_version
 def _generate_port_number(port=3000, _count=count(1)):
     return port + next(_count)
 
+
+COMBINATIONS = [(Mode.SYNCHRONOUS, None, None),
+                (Mode.SYNCHRONOUS, None, 2),
+                (Mode.ASYNCHRONOUS, 'http', None),
+                (Mode.ASYNCHRONOUS, 'http', 2),
+                (Mode.ASYNCHRONOUS, 'socket', None),
+                (Mode.ASYNCHRONOUS, 'socket', 2),
+                (Mode.HOGWILD, 'http', None),
+                (Mode.HOGWILD, 'http', 2),
+                (Mode.HOGWILD, 'socket', None),
+                (Mode.HOGWILD, 'socket', 2)]
+
+
 # enumerate possible combinations for training mode and parameter server for a classification model while also
 # validatiing multiple workers for repartitioning
-@pytest.mark.parametrize('mode,parameter_server_mode,num_workers',
-                         [(Mode.SYNCHRONOUS, None, None),
-                          (Mode.SYNCHRONOUS, None, 2),
-                          (Mode.ASYNCHRONOUS, 'http', None),
-                          (Mode.ASYNCHRONOUS, 'http', 2),
-                          (Mode.ASYNCHRONOUS, 'socket', None),
-                          (Mode.ASYNCHRONOUS, 'socket', 2),
-                          (Mode.HOGWILD, 'http', None),
-                          (Mode.HOGWILD, 'http', 2),
-                          (Mode.HOGWILD, 'socket', None),
-                          (Mode.HOGWILD, 'socket', 2)])
-def test_training_classification(spark_context, mode, parameter_server_mode, num_workers, mnist_data, classification_model):
+@pytest.mark.parametrize('mode,parameter_server_mode,num_workers', COMBINATIONS)
+def test_training_classification(spark_context, mode, parameter_server_mode, num_workers, mnist_data,
+                                 classification_model):
     # Define basic parameters
     batch_size = 64
     epochs = 10
@@ -72,17 +82,7 @@ def test_training_classification(spark_context, mode, parameter_server_mode, num
 
 # enumerate possible combinations for training mode and parameter server for a regression model while also validating
 # multiple workers for repartitioning
-@pytest.mark.parametrize('mode,parameter_server_mode,num_workers',
-                         [(Mode.SYNCHRONOUS, None, None),
-                          (Mode.SYNCHRONOUS, None, 2),
-                          (Mode.ASYNCHRONOUS, 'http', None),
-                          (Mode.ASYNCHRONOUS, 'http', 2),
-                          (Mode.ASYNCHRONOUS, 'socket', None),
-                          (Mode.ASYNCHRONOUS, 'socket', 2),
-                          (Mode.HOGWILD, 'http', None),
-                          (Mode.HOGWILD, 'http', 2),
-                          (Mode.HOGWILD, 'socket', None),
-                          (Mode.HOGWILD, 'socket', 2)])
+@pytest.mark.parametrize('mode,parameter_server_mode,num_workers', COMBINATIONS)
 def test_training_regression(spark_context, mode, parameter_server_mode, num_workers, boston_housing_dataset,
                              regression_model):
     x_train, y_train, x_test, y_test = boston_housing_dataset
@@ -147,3 +147,44 @@ def test_training_regression_no_metrics(spark_context, boston_housing_dataset, r
                    spark_model.master_network.evaluate(x_test, y_test), abs_tol=0.01)
 
 
+@pytest.mark.parametrize('frequency', [Frequency.EPOCH, Frequency.BATCH])
+def test_multiple_input_model(spark_session, frequency):
+    def row_to_tuple(row):
+        return [row.user_id_encoded, row.track_id_encoded], row.frequency
+
+    # Read and preprocess data
+    current_dir = os.path.dirname(__file__)
+    parent_dir = os.path.dirname(current_dir)
+    df = spark_session.read.csv(f'{parent_dir}/data/sample_data.csv', header=True, inferSchema=True)
+
+    indexer_user = StringIndexer(inputCol="user_id", outputCol="user_id_encoded")
+    df = indexer_user.fit(df).transform(df)
+    indexer_track = StringIndexer(inputCol="track_id", outputCol="track_id_encoded")
+    df = indexer_track.fit(df).transform(df)
+
+    assembler = VectorAssembler(inputCols=["user_id_encoded", "track_id_encoded"], outputCol="features")
+    df_transformed = assembler.transform(df)
+
+    # Keras model inputs
+    n_users = df.select('user_id').distinct().count()
+    n_items = df.select('track_id').distinct().count()
+    n_latent_factors = 50  # Example
+
+    user_input = Input(shape=(1,), name='user_input')
+    item_input = Input(shape=(1,), name='item_input')
+    user_embedding = Embedding(output_dim=n_latent_factors, input_dim=n_users)(user_input)
+    item_embedding = Embedding(output_dim=n_latent_factors, input_dim=n_items)(item_input)
+    user_vec = Flatten()(user_embedding)
+    item_vec = Flatten()(item_embedding)
+    dot = Dot(axes=1)([user_vec, item_vec])
+    model = Model([user_input, item_input], dot)
+    model.compile(optimizer=SGD(), loss='mean_squared_error')
+
+    rdd_final = df_transformed.rdd.map(row_to_tuple)
+
+    spark_model = SparkModel(model, frequency=frequency, mode=Mode.ASYNCHRONOUS, port=_generate_port_number())
+    spark_model.fit(rdd_final, epochs=5, batch_size=32, verbose=0, validation_split=0.1)
+    rdd_test_data = rdd_final.map(lambda x: x[0])
+    rdd_test_targets = rdd_final.map(lambda x: x[1])
+    assert spark_model.predict(rdd_test_data)
+    assert spark_model.evaluate(np.array(rdd_test_data.collect()), np.array(rdd_test_targets.collect()))
