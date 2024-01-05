@@ -1,6 +1,7 @@
 import os
 from itertools import count
 from math import isclose
+
 from keras import Model
 from pyspark.ml.feature import StringIndexer, VectorAssembler
 from tensorflow.keras.optimizers.legacy import SGD
@@ -14,7 +15,6 @@ from elephas.utils.rdd_utils import to_simple_rdd
 
 import pytest
 import numpy as np
-import tensorflow as tf
 
 from elephas.utils.versioning_utils import get_minor_version
 
