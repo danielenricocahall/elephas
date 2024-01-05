@@ -16,6 +16,8 @@ from elephas.utils.rdd_utils import to_simple_rdd
 import pytest
 import numpy as np
 
+from elephas.utils.versioning_utils import get_minor_version
+
 
 def _generate_port_number(port=3000, _count=count(1)):
     return port + next(_count)

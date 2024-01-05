@@ -1,4 +1,5 @@
 import numpy as np
+import tensorflow as tf
 from itertools import tee
 from tensorflow.keras.models import model_from_json
 from tensorflow.keras.optimizers import get as get_optimizer
@@ -7,6 +8,8 @@ from tensorflow.python.keras.utils.generic_utils import slice_arrays
 from .enums.frequency import Frequency
 from .utils import subtract_params
 from .parameter import BaseParameterClient
+
+from .utils.versioning_utils import get_minor_version
 from .utils.model_utils import is_multiple_input_model, is_multiple_output_model
 
 
@@ -24,6 +27,21 @@ class SparkWorker(object):
         self.master_metrics = master_metrics
         self.custom_objects = custom_objects
         self.model = None
+
+    @property
+    def master_optimizer(self):
+        return self._master_optimizer
+
+    @master_optimizer.setter
+    def master_optimizer(self, optimizer):
+        from tensorflow.keras.optimizers.legacy import Optimizer as LegacyOptimizer
+        if get_minor_version(tf.__version__) >= 13:
+            if not isinstance(optimizer, LegacyOptimizer):
+                raise ValueError(f"In Tensorflow 2.13+, optimizer {optimizer} needs to be a legacy optimizer - "
+                                 f"subclass of "
+                                 f"tensorflow.keras.optimizers.legacy.Optimizer. Currently, non-legacy optimizers ("
+                                 f"subclasses of tensorflow.keras.optimizers) are not supported.")
+        self._master_optimizer = optimizer
 
     def train(self, data_iterator):
         """Train a keras model on a worker
