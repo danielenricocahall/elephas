@@ -15,6 +15,7 @@ h5py = "3.8.0"
 pyspark = "<=3.5.0"
 Cython = "^0.29.33"
 numpy = "1.23.5"
+transformers = "^4.36.2"
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.2.1"
@@ -22,6 +23,9 @@ pytest-pep8 = "^1.0.6"
 pytest-cov = "^4.0.0"
 pytest-spark = "^0.6.0"
 mock = "^5.0.1"
+
+[tool.poetry.extras]
+huggingface = ["transformers"]
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

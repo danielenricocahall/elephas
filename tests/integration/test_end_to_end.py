@@ -4,13 +4,17 @@ from math import isclose
 
 from keras import Model
 from pyspark.ml.feature import StringIndexer, VectorAssembler
+from sklearn.datasets import fetch_20newsgroups
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
 from tensorflow.keras.optimizers.legacy import SGD
 from tensorflow.keras import Input
 from tensorflow.keras.layers import Embedding, Flatten, Dot
+from transformers import AutoTokenizer, TFAutoModelForSequenceClassification
 
 from elephas.enums.modes import Mode
 from elephas.enums.frequency import Frequency
-from elephas.spark_model import SparkModel
+from elephas.spark_model import SparkModel, SparkHFModel
 from elephas.utils.rdd_utils import to_simple_rdd
 
 import pytest
@@ -188,3 +192,46 @@ def test_multiple_input_model(spark_session, frequency):
     rdd_test_targets = rdd_final.map(lambda x: x[1])
     assert spark_model.predict(rdd_test_data)
     assert spark_model.evaluate(np.array(rdd_test_data.collect()), np.array(rdd_test_targets.collect()))
+
+
+def test_training_huggingface(spark_context):
+    spark_context._conf.set("spark.files.overwrite", "true")
+    # Define basic parameters
+    batch_size = 16
+    epochs = 3
+    num_workers = 2  # Adjust based on your Spark setup
+
+    # Load and preprocess sample data
+    newsgroups = fetch_20newsgroups(subset='train')
+    x = newsgroups.data[:200]  # Limit the data size for the test
+    y = newsgroups.target[:200]
+
+    # Encode labels
+    encoder = LabelEncoder()
+    y_encoded = encoder.fit_transform(y)
+
+    # Split data into training and test sets
+    x_train, x_test, y_train, y_test = train_test_split(x, y_encoded, test_size=0.2)
+
+    # Model and tokenizer initialization
+    model_name = 'distilbert-base-uncased'  # Example model
+
+    # Build RDD from tokenized features and labels
+    rdd = to_simple_rdd(spark_context, x_train, y_train)
+
+    # Initialize SparkHFModel
+    model = TFAutoModelForSequenceClassification.from_pretrained(model_name, num_labels=len(np.unique(y_encoded)))
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model.compile(optimizer=SGD(), loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+    spark_model = SparkHFModel(model, num_workers=num_workers, mode=Mode.SYNCHRONOUS, tokenizer=tokenizer)
+
+    # Train Spark model
+    spark_model._fit(rdd, epochs=epochs, batch_size=batch_size)
+
+    # Run inference on trained Spark model
+    predictions = spark_model._predict(spark_context.parallelize(x_test))
+
+    # Evaluate results
+    y_pred = [np.argmax(pred) for pred in predictions]
+    accuracy = np.mean([pred == true for pred, true in zip(y_pred, y_test)])
+    print("Test Accuracy:", accuracy)

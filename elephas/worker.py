@@ -1,9 +1,12 @@
 import numpy as np
 import tensorflow as tf
 from itertools import tee
+
+from pyspark import SparkFiles
 from tensorflow.keras.models import model_from_json
 from tensorflow.keras.optimizers import get as get_optimizer
 from tensorflow.python.keras.utils.generic_utils import slice_arrays
+from transformers import TFAutoModelForSequenceClassification
 
 from .enums.frequency import Frequency
 from .utils import subtract_params
@@ -156,3 +159,42 @@ class AsynchronousSparkWorker(object):
             raise ValueError(
                 'frequency parameter can be `epoch` or `batch, got {}'.format(self.frequency))
         yield []
+
+
+class SparkHFWorker(SparkWorker):
+    """Synchronous worker for Huggingface models"""
+
+    def __init__(self, json, parameters, train_config, master_optimizer,
+                 master_loss, master_metrics, custom_objects, temp_dir, tokenizer):
+        super().__init__(json, parameters, train_config, master_optimizer,
+                 master_loss, master_metrics, custom_objects)
+        self.tokenizer = tokenizer
+        self.temp_dir = temp_dir
+
+    def train(self, data_iterator):
+        """Train a Huggingface model on a worker
+        """
+        temp_dir = self.temp_dir.value
+        config = SparkFiles.get(temp_dir)
+        x_train, y_train = zip(*data_iterator)
+        num_labels = len(np.unique(y_train))
+
+        self.model = TFAutoModelForSequenceClassification.from_pretrained(config, local_files_only=True)
+        self.model.compile(optimizer=get_optimizer(self.master_optimizer),
+                           loss=self.master_loss, metrics=self.master_metrics)
+
+        x_train = self.tokenizer(list(x_train), padding=True, truncation=True, return_tensors="tf")
+        y_train = np.array(y_train)
+
+        weights_before_training = self.model.get_weights()
+        history = self.model.fit(dict(x_train), y_train, **self.train_config)
+        weights_after_training = self.model.get_weights()
+        deltas = subtract_params(
+            weights_before_training, weights_after_training)
+        if history:
+            yield [deltas, history.history]
+        else:
+            yield [deltas, None]
+
+
+
