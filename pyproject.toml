@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "elephas"
-version = "5.0.0"
+version = "5.2.1"
 description = "Distributed deep learning on Spark with Keras"
 readme = "README.md"
 homepage = "https://danielenricocahall.github.io/elephas/"
