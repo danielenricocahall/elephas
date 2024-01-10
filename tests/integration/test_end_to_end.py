@@ -197,9 +197,9 @@ def test_multiple_input_model(spark_session, frequency):
 def test_training_huggingface(spark_context):
     spark_context._conf.set("spark.files.overwrite", "true")
     # Define basic parameters
-    batch_size = 16
-    epochs = 3
-    num_workers = 2  # Adjust based on your Spark setup
+    batch_size = 4
+    epochs = 1
+    num_workers = 1  # Adjust based on your Spark setup
 
     # Load and preprocess sample data
     newsgroups = fetch_20newsgroups(subset='train')

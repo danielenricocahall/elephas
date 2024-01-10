@@ -165,11 +165,12 @@ class SparkHFWorker(SparkWorker):
     """Synchronous worker for Huggingface models"""
 
     def __init__(self, json, parameters, train_config, master_optimizer,
-                 master_loss, master_metrics, custom_objects, temp_dir, tokenizer):
+                 master_loss, master_metrics, custom_objects, temp_dir, tokenizer, loader):
         super().__init__(json, parameters, train_config, master_optimizer,
                  master_loss, master_metrics, custom_objects)
         self.tokenizer = tokenizer
         self.temp_dir = temp_dir
+        self.loader = loader
 
     def train(self, data_iterator):
         """Train a Huggingface model on a worker
@@ -177,9 +178,8 @@ class SparkHFWorker(SparkWorker):
         temp_dir = self.temp_dir.value
         config = SparkFiles.get(temp_dir)
         x_train, y_train = zip(*data_iterator)
-        num_labels = len(np.unique(y_train))
 
-        self.model = TFAutoModelForSequenceClassification.from_pretrained(config, local_files_only=True)
+        self.model = self.loader.from_pretrained(config, local_files_only=True)
         self.model.compile(optimizer=get_optimizer(self.master_optimizer),
                            loss=self.master_loss, metrics=self.master_metrics)
 

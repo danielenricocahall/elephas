@@ -17,7 +17,7 @@ from tensorflow.keras.models import load_model
 from tensorflow.keras.models import model_from_json
 from tensorflow.keras.optimizers import get as get_optimizer
 from tensorflow.keras.optimizers import serialize as serialize_optimizer, deserialize as deserialize_optimizer
-from transformers import TFAutoModelForSequenceClassification, AutoTokenizer
+from transformers import TFAutoModelForSequenceClassification, AutoTokenizer, TFAutoModel
 
 from .enums.frequency import Frequency
 from .enums.modes import Mode
@@ -26,7 +26,7 @@ from .parameter.factory import ClientServerFactory
 from .utils import lp_to_simple_rdd, to_simple_rdd
 from .utils import model_to_dict
 from .utils import subtract_params, divide_by
-from .utils.model_utils import is_multiple_input_model, is_multiple_output_model
+from .utils.model_utils import is_multiple_input_model, is_multiple_output_model, LossModelTypeMapper, ModelType
 from .worker import AsynchronousSparkWorker, SparkWorker, SparkHFWorker
 
 
@@ -391,7 +391,7 @@ class SparkHFModel(SparkModel):
             temp_dir = rdd.context.broadcast(temp_dir)
 
             worker = SparkHFWorker(model_json, parameters, train_config,
-                                   optimizer, loss, metrics, custom, temp_dir=temp_dir, tokenizer=self.tokenizer)
+                                   optimizer, loss, metrics, custom, temp_dir=temp_dir, tokenizer=self.tokenizer, loader=self.tf_loader)
             training_outcomes = rdd.mapPartitions(worker.train).collect()
             new_parameters = self._master_network.get_weights()
             number_of_sub_models = len(training_outcomes)
@@ -401,6 +401,14 @@ class SparkHFModel(SparkModel):
                 weighted_grad = divide_by(grad, number_of_sub_models)
                 new_parameters = subtract_params(new_parameters, weighted_grad)
             self._master_network.set_weights(new_parameters)
+
+    @property
+    def tf_loader(self):
+        if LossModelTypeMapper().get_model_type(self._master_network.loss) == ModelType.CLASSIFICATION:
+            loader = TFAutoModelForSequenceClassification
+        else:
+            loader = TFAutoModel
+        return loader
 
     def _predict(self, rdd: RDD) -> List[np.ndarray]:
         """
@@ -412,7 +420,7 @@ class SparkHFModel(SparkModel):
         broadcasted_weights = rdd.context.broadcast(weights)
 
         def _predict(partition):
-            model = TFAutoModelForSequenceClassification.from_json(serialized_model)
+            model = self.tf_loader.from_json(serialized_model)
             model.set_weights(broadcasted_weights.value)
             predictions = []
             for batch in partition:
