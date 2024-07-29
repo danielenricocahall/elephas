@@ -335,7 +335,8 @@ class SparkMLlibModel(SparkModel):
         """Train an elephas model on an RDD of LabeledPoints
         """
         rdd = lp_to_simple_rdd(labeled_points, categorical, nb_classes)
-        rdd = rdd.repartition(self.num_workers)
+        if self.num_workers:
+            rdd = rdd.repartition(self.num_workers)
         self._fit(rdd=rdd, epochs=epochs, batch_size=batch_size,
                   verbose=verbose, validation_split=validation_split)
 
