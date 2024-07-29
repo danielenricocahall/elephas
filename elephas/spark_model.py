@@ -1,6 +1,10 @@
 import json
+import logging
+import os
+import shutil
 import subprocess
 import tempfile
+from time import sleep
 from uuid import uuid4
 from pathlib import Path
 from copy import deepcopy
@@ -12,7 +16,7 @@ import h5py
 import numpy as np
 import pyspark
 import tensorflow as tf
-from pyspark import RDD
+from pyspark import RDD, SparkFiles
 from tensorflow.keras.models import load_model
 from tensorflow.keras.models import model_from_json
 from tensorflow.keras.optimizers import get as get_optimizer
@@ -350,7 +354,8 @@ class SparkMLlibModel(SparkModel):
 class SparkHFModel(SparkModel):
     def __init__(self, model, mode=Mode.ASYNCHRONOUS,
                  frequency=Frequency.EPOCH,
-                 parameter_server_mode='http', num_workers=None, batch_size=32, port=4000, tokenizer=None, *args, **kwargs):
+                 parameter_server_mode='http', num_workers=None, batch_size=32, port=4000, tokenizer=None, *args,
+                 **kwargs):
         """
         SparkHFModel
 
@@ -391,7 +396,8 @@ class SparkHFModel(SparkModel):
             temp_dir = rdd.context.broadcast(temp_dir)
 
             worker = SparkHFWorker(model_json, parameters, train_config,
-                                   optimizer, loss, metrics, custom, temp_dir=temp_dir, tokenizer=self.tokenizer, loader=self.tf_loader)
+                                   optimizer, loss, metrics, custom, temp_dir=temp_dir, tokenizer=self.tokenizer,
+                                   loader=self.tf_loader)
             training_outcomes = rdd.mapPartitions(worker.train).collect()
             new_parameters = self._master_network.get_weights()
             number_of_sub_models = len(training_outcomes)
@@ -414,22 +420,44 @@ class SparkHFModel(SparkModel):
         """
         Perform distributed inference with the Hugging Face model.
         """
-        serialized_model = self._master_network.to_json()
         tokenizer = self.tokenizer
-        weights = self._master_network.get_weights()
-        broadcasted_weights = rdd.context.broadcast(weights)
+        loader = self.tf_loader
+        with tempfile.TemporaryDirectory() as temp_dir:
+            _zip_path = save_and_zip_model(self._master_network, temp_dir)
+            rdd.context.addFile(_zip_path)
 
-        def _predict(partition):
-            model = self.tf_loader.from_json(serialized_model)
-            model.set_weights(broadcasted_weights.value)
-            predictions = []
-            for batch in partition:
-                inputs = tokenizer(batch, padding=True, truncation=True, return_tensors="tf")
-                outputs = model(inputs)
-                predictions.extend(outputs.logits.numpy())
-            return predictions
+            def _predict(partition):
+                zip_path = SparkFiles.get(_zip_path)
+                model_dir = tempfile.mkdtemp()
 
-        return rdd.mapPartitions(_predict).collect()
+                shutil.unpack_archive(zip_path, model_dir)
+
+                model = loader.from_pretrained(model_dir, local_files_only=True)
+
+                predictions = []
+                for batch in partition:
+                    inputs = tokenizer(batch, padding=True, truncation=True, return_tensors="tf")
+                    outputs = model(**inputs)
+                    predictions.extend(outputs.logits.numpy())
+                shutil.rmtree(model_dir)
+                return predictions
+
+            if self.num_workers and self.num_workers > 1:
+                # TODO: Consider giving this the treatment of the other `_predict` method in the base `SparkModel` class
+                # as the ordering of the predictions may not be preserved here
+                rdd = rdd.repartition(self.num_workers)
+            return rdd.mapPartitions(_predict).collect()
+
+    def _evaluate(self, rdd: RDD, **kwargs) -> List[np.ndarray]:
+        """
+        Perform distributed evaluation with the Hugging Face model.
+        """
+        # TODO: forgive me for violating Liskov's substitution principle here, but I'm not sure how to implement this
+        logging.info(f"We're not currently supporting distributed evaluation for Hugging Face models, as the logic "
+                     f"gets a bit more gnarly than for Keras models since the model can be predictive or generative, "
+                     f"and there isn't a native `evaluate` method on HuggingFace models."
+                     f" Maybe in a future release.")
+        return []
 
     def save(self, file_name: str, overwrite: bool = False, to_hadoop: bool = False):
         """
@@ -447,10 +475,6 @@ class SparkHFModel(SparkModel):
             # Logic for saving to Hadoop (not implemented)
             raise NotImplementedError("Saving to Hadoop needs to be implemented.")
 
-    # ... [other methods as needed, potentially including evaluate, etc.] ...
-
-
-# Additional methods and error handling should be added based on specific use cases and data formats.
 
 def load_spark_model(
         file_name: str, from_hadoop: bool = False
@@ -487,3 +511,11 @@ def load_spark_model(
         return SparkModel(model=model, **config)
     elif class_name == SparkMLlibModel.__name__:
         return SparkMLlibModel(model=model, **config)
+
+
+def save_and_zip_model(model, temp_dir):
+    # Save model to the temporary directory
+    model.save_pretrained(temp_dir)
+    # Create a zip file of the model directory
+    zip_path = shutil.make_archive(temp_dir, 'zip', temp_dir)
+    return zip_path
