@@ -335,18 +335,16 @@ class SparkMLlibModel(SparkModel):
         """Train an elephas model on an RDD of LabeledPoints
         """
         rdd = lp_to_simple_rdd(labeled_points, categorical, nb_classes)
-        if self.num_workers:
-            rdd = rdd.repartition(self.num_workers)
-        self._fit(rdd=rdd, epochs=epochs, batch_size=batch_size,
+        super().fit(rdd=rdd, epochs=epochs, batch_size=batch_size,
                   verbose=verbose, validation_split=validation_split)
 
     def predict(self, mllib_data):
         """Predict probabilities for an RDD of features
         """
         if isinstance(mllib_data, pyspark.mllib.linalg.Matrix):
-            return to_matrix(self._master_network.predict(from_matrix(mllib_data)))
+            return to_matrix(self.predict(from_matrix(mllib_data)))
         elif isinstance(mllib_data, pyspark.mllib.linalg.Vector):
-            return to_vector(self._master_network.predict(from_vector(mllib_data)))
+            return to_vector(self.predict(from_vector(mllib_data)))
         else:
             raise ValueError(
                 'Provide either an MLLib matrix or vector, got {}'.format(mllib_data.__name__))
