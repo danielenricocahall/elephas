@@ -179,7 +179,7 @@ class SparkHFWorker(SparkWorker):
         config = SparkFiles.get(temp_dir)
         x_train, y_train = zip(*data_iterator)
 
-        self.model = self.loader.from_pretrained(config, local_files_only=True)
+        self.model = self.loader.from_pretrained(config)
         self.model.compile(optimizer=get_optimizer(self.master_optimizer),
                            loss=self.master_loss, metrics=self.master_metrics)
 

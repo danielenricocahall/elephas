@@ -386,16 +386,13 @@ class SparkHFModel(SparkModel):
         metrics = self.master_metrics
         custom = self.custom_objects
         train_config = kwargs
-        init = self._master_network.get_weights()
-        parameters = rdd.context.broadcast(init)
-        model_json = self._master_network.config
 
         with tempfile.TemporaryDirectory() as temp_dir:
             self._master_network.save_pretrained(temp_dir)
             rdd.context.addFile(temp_dir, recursive=True)
             temp_dir = rdd.context.broadcast(temp_dir)
 
-            worker = SparkHFWorker(model_json, parameters, train_config,
+            worker = SparkHFWorker(None, None, train_config,
                                    optimizer, loss, metrics, custom, temp_dir=temp_dir, tokenizer=self.tokenizer,
                                    loader=self.tf_loader)
             training_outcomes = rdd.mapPartitions(worker.train).collect()
@@ -458,6 +455,40 @@ class SparkHFModel(SparkModel):
                      f"and there isn't a native `evaluate` method on HuggingFace models."
                      f" Maybe in a future release.")
         return []
+
+    def _generate(self, rdd: RDD, **kwargs) -> List[np.ndarray]:
+        """
+        Perform distributed generation with the Hugging Face model, for generative models
+        """
+        if isinstance(self.tf_loader, TFAutoModelForSequenceClassification):
+            raise ValueError("This method is only for generative models, not classification models.")
+        tokenizer = self.tokenizer
+        loader = self.tf_loader
+        with tempfile.TemporaryDirectory() as temp_dir:
+            _zip_path = save_and_zip_model(self._master_network, temp_dir)
+            rdd.context.addFile(_zip_path)
+
+            def _generate(partition):
+                zip_path = SparkFiles.get(_zip_path)
+                model_dir = tempfile.mkdtemp()
+
+                shutil.unpack_archive(zip_path, model_dir)
+
+                model = loader.from_pretrained(model_dir, local_files_only=True)
+
+                predictions = []
+                for batch in partition:
+                    inputs = tokenizer(batch, padding=True, truncation=True, return_tensors="tf")
+                    outputs = model.generate(**inputs, **kwargs)
+                    predictions.extend(outputs.logits.numpy())
+                shutil.rmtree(model_dir)
+                return predictions
+
+            if self.num_workers and self.num_workers > 1:
+                # TODO: Consider giving this the treatment of the other `_predict` method in the base `SparkModel` class
+                # as the ordering of the predictions may not be preserved here
+                rdd = rdd.repartition(self.num_workers)
+            return rdd.mapPartitions(_generate).collect()
 
     def save(self, file_name: str, overwrite: bool = False, to_hadoop: bool = False):
         """

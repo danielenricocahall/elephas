@@ -10,7 +10,8 @@ from sklearn.preprocessing import LabelEncoder
 from tensorflow.keras.optimizers.legacy import SGD
 from tensorflow.keras import Input
 from tensorflow.keras.layers import Embedding, Flatten, Dot
-from transformers import AutoTokenizer, TFAutoModelForSequenceClassification
+from transformers import AutoTokenizer, TFAutoModelForSequenceClassification, TFGPT2LMHeadModel, GPT2Tokenizer, \
+    TFAutoModel, TFGPT2Model
 
 from elephas.enums.modes import Mode
 from elephas.enums.frequency import Frequency
@@ -214,6 +215,7 @@ def test_training_huggingface_classification(spark_context):
 
     model = TFAutoModelForSequenceClassification.from_pretrained(model_name, num_labels=len(np.unique(y_encoded)))
     tokenizer = AutoTokenizer.from_pretrained(model_name)
+
     model.compile(optimizer=SGD(), loss='sparse_categorical_crossentropy', metrics=['accuracy'])
     spark_model = SparkHFModel(model, num_workers=num_workers, mode=Mode.SYNCHRONOUS, tokenizer=tokenizer)
 
@@ -222,8 +224,28 @@ def test_training_huggingface_classification(spark_context):
     # Run inference on trained Spark model
     predictions = spark_model.predict(spark_context.parallelize(x_test))
 
-
-    # Evaluate results
     y_pred = [np.argmax(pred) for pred in predictions]
     accuracy = np.mean([pred == true for pred, true in zip(y_pred, y_test)])
     print("Test Accuracy:", accuracy)
+
+
+def test_training_huggingface_generation(spark_context):
+    batch_size = 2
+    epochs = 1
+    num_workers = 2
+
+    newsgroups = fetch_20newsgroups(subset='train')
+    x = newsgroups.data[:50]  # Limit the data size for the test
+
+    x_train, x_test = train_test_split(x, test_size=0.2)
+
+    model_name = 'distilgpt2'  # use the smaller generative model for testing
+
+    rdd = spark_context.parallelize(x_train)
+    model = TFAutoModel.from_pretrained(model_name)
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+
+    model.compile(optimizer=SGD(), loss=model.compute_loss, metrics=['accuracy'])
+
+    spark_model = SparkHFModel(model, num_workers=num_workers, mode=Mode.SYNCHRONOUS, tokenizer=tokenizer)
+    spark_model.fit(rdd, epochs=epochs, batch_size=batch_size)
