@@ -14,7 +14,7 @@ Flask = "^2.2.3"
 h5py = "3.8.0"
 pyspark = "<=3.5.1"
 Cython = "^0.29.33"
-numpy = "1.23.5"
+numpy = "1.26.4"
 transformers = { version = "<=4.42.4", optional = true }
 
 
