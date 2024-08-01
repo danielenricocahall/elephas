@@ -1,10 +1,8 @@
 import json
 import logging
-import os
 import shutil
 import subprocess
 import tempfile
-from time import sleep
 from uuid import uuid4
 from pathlib import Path
 from copy import deepcopy
@@ -21,7 +19,6 @@ from tensorflow.keras.models import load_model
 from tensorflow.keras.models import model_from_json
 from tensorflow.keras.optimizers import get as get_optimizer
 from tensorflow.keras.optimizers import serialize as serialize_optimizer, deserialize as deserialize_optimizer
-from transformers import TFAutoModelForSequenceClassification, AutoTokenizer, TFAutoModel
 
 from .enums.frequency import Frequency
 from .enums.modes import Mode
@@ -375,6 +372,7 @@ class SparkHFModel(SparkModel):
         super().__init__(model, mode=mode, frequency=frequency, parameter_server_mode=parameter_server_mode,
                          num_workers=num_workers, batch_size=batch_size, port=port, *args, **kwargs)
         if isinstance(tokenizer, str):
+            from transformers import AutoTokenizer
             self.tokenizer = AutoTokenizer.from_pretrained(tokenizer)
         else:
             self.tokenizer = tokenizer
@@ -412,6 +410,7 @@ class SparkHFModel(SparkModel):
 
     @property
     def tf_loader(self):
+        from transformers import TFAutoModelForSequenceClassification, TFAutoModel
         if LossModelTypeMapper().get_model_type(self._master_network.loss) == ModelType.CLASSIFICATION:
             loader = TFAutoModelForSequenceClassification
         else:

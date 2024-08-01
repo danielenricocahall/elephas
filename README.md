@@ -6,7 +6,7 @@
 
 [![Build Status](https://github.com/danielenricocahall/elephas/actions/workflows/ci.yaml/badge.svg)](https://github.com/danielenricocahall/elephas/actions/workflows/ci.yaml/badge.svg)
 [![license](https://img.shields.io/github/license/mashape/apistatus.svg?maxAge=2592000)](https://github.com/danielenricocahall/elephas/blob/master/LICENSE)
-[![Supported Versions](https://img.shields.io/badge/python-3.8%20%7C%203.9%20%7C%203.10-blue)](https://img.shields.io/badge/python-3.8%20%7C%203.9%20%7C%203.10-blue)
+[![Supported Versions](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11-blue)](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11-blue)
 
 Elephas is an extension of [Keras](http://keras.io), which allows you to run distributed deep learning models at 
 scale with [Spark](http://spark.apache.org). Elephas currently supports a number of 
