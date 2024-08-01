@@ -590,6 +590,17 @@ files = [
 numpy = ">=1.14.5"
 
 [[package]]
+name = "huggingface"
+version = "0.0.1"
+description = "HuggingFace is a single library comprising the main HuggingFace libraries."
+optional = true
+python-versions = "*"
+files = [
+    {file = "huggingface-0.0.1-py3-none-any.whl", hash = "sha256:98a3409537557cd2fd768997ef94cab08529f86c5e106e6d54bbabdd5ee03910"},
+    {file = "huggingface-0.0.1.tar.gz", hash = "sha256:0a2f228fd956801d68b7c6a8bef478dfa60c4b7d7eba572ea7de39ecf87e505a"},
+]
+
+[[package]]
 name = "huggingface-hub"
 version = "0.20.2"
 description = "Client library to download and publish models, datasets and other repos on the huggingface.co hub"
@@ -2067,9 +2078,9 @@ docs = ["furo", "jaraco.packaging (>=9)", "jaraco.tidelift (>=1.4)", "rst.linker
 testing = ["big-O", "flake8 (<5)", "jaraco.functools", "jaraco.itertools", "more-itertools", "pytest (>=6)", "pytest-black (>=0.3.7)", "pytest-checkdocs (>=2.4)", "pytest-cov", "pytest-enabler (>=1.3)", "pytest-flake8", "pytest-mypy (>=0.9.1)"]
 
 [extras]
-huggingface = ["transformers"]
+huggingface = []
 
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.8,<3.12"
-content-hash = "2fea1ee862e5e619a1404285e758120e2ff2ee75f6f9be2347108d07516abfc1"
+content-hash = "a1b18605185d449fdedc90405f9e6aee9b9ca303ca29915fb56599e5893e7048"
