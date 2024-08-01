@@ -370,6 +370,9 @@ class SparkHFModel(SparkModel):
         :param batch_size: batch size used for training and inference
         :param port: port used in case of 'http' parameter server mode
         """
+        if mode in [Mode.ASYNCHRONOUS, Mode.HOGWILD]:
+            raise ValueError(f"Asynchronous and Hogwild modes are not supported for Hugging Face models yet - please "
+                             f"use {Mode.SYNCHRONOUS} mode.")
         super().__init__(model, mode=mode, frequency=frequency, parameter_server_mode=parameter_server_mode,
                          num_workers=num_workers, batch_size=batch_size, port=port, *args, **kwargs)
         if isinstance(tokenizer, str):
