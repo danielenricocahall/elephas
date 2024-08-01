@@ -10,11 +10,11 @@ license = "MIT"
 [tool.poetry.dependencies]
 python = ">=3.9,<3.12"
 tensorflow = ">2.2,<=2.15.1"
-Flask = "^2.2.3"
+Flask = "^2.3.3"
 h5py = "3.11.0"
 pyspark = "<=3.5.1"
 Cython = "^0.29.33"
-numpy = "1.26.4"
+numpy = "1.23.5"
 transformers = { version = "<=4.42.4", optional = true }
 
 
