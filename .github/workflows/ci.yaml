@@ -36,7 +36,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install poetry
           poetry config virtualenvs.create false
-          poetry install --with huggingface
+          poetry install -E huggingface
       - name: Test with pytest
         run: |
           pytest tests
