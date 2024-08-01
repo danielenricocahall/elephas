@@ -15,7 +15,7 @@ h5py = "3.8.0"
 pyspark = "<=3.5.0"
 Cython = "^0.29.33"
 numpy = "1.23.5"
-huggingface = { version = "<=4.36.2", optional = true }
+transformers = { version = "<=4.36.2", optional = true }
 
 
 [tool.poetry.dev-dependencies]
