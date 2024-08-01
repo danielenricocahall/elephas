@@ -16,6 +16,7 @@ applications, including:
 - [Distributed inference and evaluation of deep learning models](#distributed-inference-and-evaluation)
 - [~~Distributed training of ensemble models~~](#distributed-training-of-ensemble-models)  (removed as of 3.0.0)
 - [~~Distributed hyper-parameter optimization~~](#distributed-hyper-parameter-optimization)  (removed as of 3.0.0)
+- [Distributed training and inference with Hugging Face models](#hugging-face-models-training-and-inference) (added as 6.0.0)
 
 
 
@@ -303,6 +304,55 @@ With ```data``` and ```model``` defined as above, this is a simple as running
 result = hyperparam_model.best_ensemble(nb_ensemble_models=10, model=model, data=data, max_evals=5)
 ```
 In this example an ensemble of 10 models is built, based on optimization of at most 5 runs on each of the Spark workers.
+
+
+## Hugging Face Models Training and Inference
+As of 6.0.0, Elephas now supports distributed training (and inference) with [HuggingFace](https://huggingface.co/) models, currently for classification only and in the `"synchronous"` training mode. In future releases, we hope to expand this to other types of models (e.g; generative) and the `"asynchronous"` and `"hogwild"` training modes. This can be accomplished using the `SparkHFModel`:
+
+```python 
+from elephas.spark_model import SparkHFModel
+from elephas.utils.rdd_utils import to_simple_rdd
+from sklearn.datasets import fetch_20newsgroups
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
+from transformers import AutoTokenizer, TFAutoModelForSequenceClassification
+from tensorflow.keras.optimizers import SGD
+batch_size = ...
+epochs = ...
+num_workers = ...
+
+newsgroups = fetch_20newsgroups(subset='train')
+x = newsgroups.data
+y = newsgroups.target
+
+encoder = LabelEncoder()
+y_encoded = encoder.fit_transform(y)
+
+x_train, x_test, y_train, y_test = train_test_split(x, y_encoded, test_size=0.2)
+
+model_name = 'albert-base-v2'
+
+rdd = to_simple_rdd(spark_context, x_train, y_train)
+
+model = TFAutoModelForSequenceClassification.from_pretrained(model_name, num_labels=len(np.unique(y_encoded)))
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+model.compile(optimizer=SGD(), loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+spark_model = SparkHFModel(model, num_workers=num_workers, mode="synchronous", tokenizer=tokenizer)
+
+spark_model.fit(rdd, epochs=epochs, batch_size=batch_size)
+
+# Run inference on trained Spark model
+predictions = spark_model.predict(spark_context.parallelize(x_test))
+```
+
+
+The computational model is the same as for Keras models, except the model is serialized and deserialized differently due to differences in the HuggingFace API. 
+
+To use this capability, just install this package with the `huggingface` extra:
+
+```bash
+pip install elephas[huggingface]
+```
 
 ## Discussion
 

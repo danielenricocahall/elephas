@@ -1,5 +1,10 @@
 import json
+import logging
+import os
+import shutil
 import subprocess
+import tempfile
+from time import sleep
 from uuid import uuid4
 from pathlib import Path
 from copy import deepcopy
@@ -11,20 +16,22 @@ import h5py
 import numpy as np
 import pyspark
 import tensorflow as tf
-from pyspark import RDD
+from pyspark import RDD, SparkFiles
 from tensorflow.keras.models import load_model
 from tensorflow.keras.models import model_from_json
 from tensorflow.keras.optimizers import get as get_optimizer
 from tensorflow.keras.optimizers import serialize as serialize_optimizer, deserialize as deserialize_optimizer
+from transformers import TFAutoModelForSequenceClassification, AutoTokenizer, TFAutoModel
 
+from .enums.frequency import Frequency
 from .enums.modes import Mode
 from .mllib import to_matrix, from_matrix, to_vector, from_vector
 from .parameter.factory import ClientServerFactory
 from .utils import lp_to_simple_rdd, to_simple_rdd
 from .utils import model_to_dict
 from .utils import subtract_params, divide_by
-from .utils.model_utils import is_multiple_input_model, is_multiple_output_model
-from .worker import AsynchronousSparkWorker, SparkWorker
+from .utils.model_utils import is_multiple_input_model, is_multiple_output_model, LossModelTypeMapper, ModelType
+from .worker import AsynchronousSparkWorker, SparkWorker, SparkHFWorker
 
 
 class SparkModel:
@@ -287,7 +294,9 @@ class SparkModel:
         custom_objects = self.custom_objects
         metrics = self.master_metrics
 
-        def _evaluate(model, optimizer, loss: Callable[[tf.Tensor, tf.Tensor], tf.Tensor], custom_objects: Dict[str, Any], metrics: List[str], kwargs: Dict[str, Any], data_iterator) -> List[Union[float, int]]:
+        def _evaluate(model, optimizer, loss: Callable[[tf.Tensor, tf.Tensor], tf.Tensor],
+                      custom_objects: Dict[str, Any], metrics: List[str], kwargs: Dict[str, Any], data_iterator) -> \
+                List[Union[float, int]]:
             model = model_from_json(model, custom_objects)
             model.compile(optimizer, loss, metrics)
             model.set_weights(weights.value)
@@ -320,46 +329,153 @@ class SparkModel:
 
 class SparkMLlibModel(SparkModel):
 
-    def __init__(self, model, mode=Mode.ASYNCHRONOUS, frequency='epoch', parameter_server_mode='http',
-                 num_workers=4, elephas_optimizer=None, custom_objects=None, batch_size=32, port=4000, *args, **kwargs):
-        """SparkMLlibModel
-
-        The Spark MLlib model takes RDDs of LabeledPoints for training.
-
-        :param model: Compiled Keras model
-        :param mode: String, choose from `asynchronous`, `synchronous` and `hogwild`
-        :param frequency: String, either `epoch` or `batch`
-        :param parameter_server_mode: String, either `http` or `socket`
-        :param num_workers: int, number of workers used for training (defaults to None)
-        :param custom_objects: Keras custom objects
-        :param batch_size: batch size used for training and inference
-        :param port: port used in case of 'http' parameter server mode
-        """
-        SparkModel.__init__(self, model=model, mode=mode, frequency=frequency,
-                            parameter_server_mode=parameter_server_mode, num_workers=num_workers,
-                            custom_objects=custom_objects,
-                            batch_size=batch_size, port=port, *args, **kwargs)
-
     def fit(self, labeled_points: RDD, epochs: int = 10, batch_size: int = 32, verbose: int = 0,
             validation_split: float = 0.1,
             categorical: bool = False, nb_classes: Optional[int] = None):
         """Train an elephas model on an RDD of LabeledPoints
         """
         rdd = lp_to_simple_rdd(labeled_points, categorical, nb_classes)
-        rdd = rdd.repartition(self.num_workers)
-        self._fit(rdd=rdd, epochs=epochs, batch_size=batch_size,
+        super().fit(rdd=rdd, epochs=epochs, batch_size=batch_size,
                   verbose=verbose, validation_split=validation_split)
 
     def predict(self, mllib_data):
         """Predict probabilities for an RDD of features
         """
         if isinstance(mllib_data, pyspark.mllib.linalg.Matrix):
-            return to_matrix(self._master_network.predict(from_matrix(mllib_data)))
+            return to_matrix(self.predict(from_matrix(mllib_data)))
         elif isinstance(mllib_data, pyspark.mllib.linalg.Vector):
-            return to_vector(self._master_network.predict(from_vector(mllib_data)))
+            return to_vector(self.predict(from_vector(mllib_data)))
         else:
             raise ValueError(
                 'Provide either an MLLib matrix or vector, got {}'.format(mllib_data.__name__))
+
+
+class SparkHFModel(SparkModel):
+    def __init__(self, model, mode=Mode.ASYNCHRONOUS,
+                 frequency=Frequency.EPOCH,
+                 parameter_server_mode='http', num_workers=None, batch_size=32, port=4000, tokenizer=None, *args,
+                 **kwargs):
+        """
+        SparkHFModel
+
+        Class for distributed training of Hugging Face models on RDDs.
+
+        :param model_name_or_path: path to pre-trained model or model identifier from huggingface.co/models
+        :param tokenizer_name_or_path: path to pre-trained tokenizer or tokenizer identifier (if different from model)
+        :param mode: String, choose from 'asynchronous', 'synchronous' and 'hogwild'
+        :param frequency: String, either 'epoch' or 'batch'
+        :param parameter_server_mode: String, either 'http' or 'socket'
+        :param num_workers: int, number of workers used for training
+        :param batch_size: batch size used for training and inference
+        :param port: port used in case of 'http' parameter server mode
+        """
+        if mode in [Mode.ASYNCHRONOUS, Mode.HOGWILD]:
+            raise ValueError(f"Asynchronous and Hogwild modes are not supported for Hugging Face models yet - please "
+                             f"use {Mode.SYNCHRONOUS} mode.")
+        super().__init__(model, mode=mode, frequency=frequency, parameter_server_mode=parameter_server_mode,
+                         num_workers=num_workers, batch_size=batch_size, port=port, *args, **kwargs)
+        if isinstance(tokenizer, str):
+            self.tokenizer = AutoTokenizer.from_pretrained(tokenizer)
+        else:
+            self.tokenizer = tokenizer
+
+    def _fit(self, rdd: RDD, **kwargs):
+        """
+        Train a Hugging Face model on an RDD.
+        """
+        optimizer = deserialize_optimizer(self.master_optimizer)
+        loss = self.master_loss
+        metrics = self.master_metrics
+        custom = self.custom_objects
+        train_config = kwargs
+        init = self._master_network.get_weights()
+        parameters = rdd.context.broadcast(init)
+        model_json = self._master_network.config
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            self._master_network.save_pretrained(temp_dir)
+            rdd.context.addFile(temp_dir, recursive=True)
+            temp_dir = rdd.context.broadcast(temp_dir)
+
+            worker = SparkHFWorker(model_json, parameters, train_config,
+                                   optimizer, loss, metrics, custom, temp_dir=temp_dir, tokenizer=self.tokenizer,
+                                   loader=self.tf_loader)
+            training_outcomes = rdd.mapPartitions(worker.train).collect()
+            new_parameters = self._master_network.get_weights()
+            number_of_sub_models = len(training_outcomes)
+            for training_outcome in training_outcomes:
+                grad, history = training_outcome
+                self.training_histories.append(history)
+                weighted_grad = divide_by(grad, number_of_sub_models)
+                new_parameters = subtract_params(new_parameters, weighted_grad)
+            self._master_network.set_weights(new_parameters)
+
+    @property
+    def tf_loader(self):
+        if LossModelTypeMapper().get_model_type(self._master_network.loss) == ModelType.CLASSIFICATION:
+            loader = TFAutoModelForSequenceClassification
+        else:
+            loader = TFAutoModel
+        return loader
+
+    def _predict(self, rdd: RDD) -> List[np.ndarray]:
+        """
+        Perform distributed inference with the Hugging Face model.
+        """
+        tokenizer = self.tokenizer
+        loader = self.tf_loader
+        with tempfile.TemporaryDirectory() as temp_dir:
+            _zip_path = save_and_zip_model(self._master_network, temp_dir)
+            rdd.context.addFile(_zip_path)
+
+            def _predict(partition):
+                zip_path = SparkFiles.get(_zip_path)
+                model_dir = tempfile.mkdtemp()
+
+                shutil.unpack_archive(zip_path, model_dir)
+
+                model = loader.from_pretrained(model_dir, local_files_only=True)
+
+                predictions = []
+                for batch in partition:
+                    inputs = tokenizer(batch, padding=True, truncation=True, return_tensors="tf")
+                    outputs = model(**inputs)
+                    predictions.extend(outputs.logits.numpy())
+                shutil.rmtree(model_dir)
+                return predictions
+
+            if self.num_workers and self.num_workers > 1:
+                # TODO: Consider giving this the treatment of the other `_predict` method in the base `SparkModel` class
+                # as the ordering of the predictions may not be preserved here
+                rdd = rdd.repartition(self.num_workers)
+            return rdd.mapPartitions(_predict).collect()
+
+    def _evaluate(self, rdd: RDD, **kwargs) -> List[np.ndarray]:
+        """
+        Perform distributed evaluation with the Hugging Face model.
+        """
+        # TODO: forgive me for violating Liskov's substitution principle here, but I'm not sure how to implement this
+        logging.info(f"We're not currently supporting distributed evaluation for Hugging Face models, as the logic "
+                     f"gets a bit more gnarly than for Keras models since the model can be predictive or generative, "
+                     f"and there isn't a native `evaluate` method on HuggingFace models."
+                     f" Maybe in a future release.")
+        return []
+
+    def save(self, file_name: str, overwrite: bool = False, to_hadoop: bool = False):
+        """
+        Save a Hugging Face model.
+        """
+        if not file_name.endswith(".h5"):
+            raise ValueError("File name must end with '.h5'")
+
+        if overwrite and not to_hadoop and Path(file_name).exists():
+            Path(file_name).unlink()
+
+        self._master_network.save_pretrained(file_name)
+
+        if to_hadoop:
+            # Logic for saving to Hadoop (not implemented)
+            raise NotImplementedError("Saving to Hadoop needs to be implemented.")
 
 
 def load_spark_model(
@@ -397,3 +513,11 @@ def load_spark_model(
         return SparkModel(model=model, **config)
     elif class_name == SparkMLlibModel.__name__:
         return SparkMLlibModel(model=model, **config)
+
+
+def save_and_zip_model(model, temp_dir):
+    # Save model to the temporary directory
+    model.save_pretrained(temp_dir)
+    # Create a zip file of the model directory
+    zip_path = shutil.make_archive(temp_dir, 'zip', temp_dir)
+    return zip_path
