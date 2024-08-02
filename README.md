@@ -307,7 +307,7 @@ In this example an ensemble of 10 models is built, based on optimization of at m
 
 
 ## Hugging Face Models Training and Inference
-As of 6.0.0, Elephas now supports distributed training (and inference) with [HuggingFace](https://huggingface.co/) models, currently for classification only and in the `"synchronous"` training mode. In future releases, we hope to expand this to other types of models (e.g; generative) and the `"asynchronous"` and `"hogwild"` training modes. This can be accomplished using the `SparkHFModel`:
+As of 6.0.0, Elephas now supports distributed training (and inference) with [HuggingFace](https://huggingface.co/) models (using the Tensorflow/Keras backend), currently for classification only and in the `"synchronous"` training mode. In future releases, we hope to expand this to other types of models (e.g; generative) and the `"asynchronous"` and `"hogwild"` training modes. This can be accomplished using the `SparkHFModel`:
 
 ```python 
 from elephas.spark_model import SparkHFModel
@@ -332,6 +332,7 @@ x_train, x_test, y_train, y_test = train_test_split(x, y_encoded, test_size=0.2)
 
 model_name = 'albert-base-v2'
 
+# Note: the expectation is that text data is being supplied - tokenization is handled during training
 rdd = to_simple_rdd(spark_context, x_train, y_train)
 
 model = TFAutoModelForSequenceClassification.from_pretrained(model_name, num_labels=len(np.unique(y_encoded)))
