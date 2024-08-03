@@ -346,7 +346,7 @@ class SparkMLlibModel(SparkModel):
 class SparkHFModel(SparkModel):
     def __init__(self, model, mode=Mode.ASYNCHRONOUS,
                  frequency=Frequency.EPOCH,
-                 parameter_server_mode='http', num_workers=None, batch_size=32, port=4000, tokenizer=None, *args,
+                 parameter_server_mode='http', num_workers=None, batch_size=32, port=4000, tokenizer=None, loader=None, *args,
                  **kwargs):
         """
         SparkHFModel
@@ -372,6 +372,7 @@ class SparkHFModel(SparkModel):
             self.tokenizer = AutoTokenizer.from_pretrained(tokenizer)
         else:
             self.tokenizer = tokenizer
+        self.tf_loader = loader
 
     def _fit(self, rdd: RDD, **kwargs):
         """
@@ -400,15 +401,6 @@ class SparkHFModel(SparkModel):
                 weighted_grad = divide_by(grad, number_of_sub_models)
                 new_parameters = subtract_params(new_parameters, weighted_grad)
             self._master_network.set_weights(new_parameters)
-
-    @property
-    def tf_loader(self):
-        from transformers import TFAutoModelForSequenceClassification, TFAutoModel
-        if LossModelTypeMapper().get_model_type(self._master_network.loss) == ModelType.CLASSIFICATION:
-            loader = TFAutoModelForSequenceClassification
-        else:
-            loader = TFAutoModel
-        return loader
 
     def _predict(self, rdd: RDD) -> List[np.ndarray]:
         """
@@ -464,12 +456,21 @@ class SparkHFModel(SparkModel):
                      f" Maybe in a future release.")
         return []
 
-    def _generate(self, rdd: RDD, **kwargs) -> List[np.ndarray]:
+    def generate(self, data: Union[RDD, np.array], **kwargs) -> List[np.ndarray]:
+        """Perform distributed generation with the model"""
+        if isinstance(data, (np.ndarray,)):
+            from pyspark.sql import SparkSession
+            sc = SparkSession.builder.getOrCreate().sparkContext
+            data = sc.parallelize(data)
+        return self._generate(data, **kwargs)
+
+    def _generate(self, rdd: RDD, tokenizer_kwargs: Dict[str, Any], **kwargs) -> List[np.ndarray]:
         """
         Perform distributed generation with the Hugging Face model, for generative models
         """
-        if isinstance(self.tf_loader, TFAutoModelForSequenceClassification):
-            raise ValueError("This method is only for generative models, not classification models.")
+        from transformers import TFAutoModelForSequenceClassification
+        if self.tf_loader.__name__ ==  'TFAutoModelForSequenceClassification':
+            raise ValueError("This method is only for causal language models, not classification models.")
         tokenizer = self.tokenizer
         loader = self.tf_loader
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -484,13 +485,13 @@ class SparkHFModel(SparkModel):
 
                 model = loader.from_pretrained(model_dir, local_files_only=True)
 
-                predictions = []
+                generations = []
                 for batch in partition:
-                    inputs = tokenizer(batch, padding=True, truncation=True, return_tensors="tf")
+                    inputs = tokenizer(batch, padding=True, truncation=True, return_tensors="tf", **tokenizer_kwargs)
                     outputs = model.generate(**inputs, **kwargs)
-                    predictions.extend(outputs.logits.numpy())
+                    generations.extend(outputs)
                 shutil.rmtree(model_dir)
-                return predictions
+                return generations
 
             if self.num_workers and self.num_workers > 1:
                 # TODO: Consider giving this the treatment of the other `_predict` method in the base `SparkModel` class

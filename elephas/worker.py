@@ -179,7 +179,6 @@ class SparkHFWorker(SparkWorker):
         temp_dir = self.temp_dir.value
         config = SparkFiles.get(temp_dir)
 
-        x_train, y_train = zip(*data_iterator)
 
         def prepare_labels(encodings):
             input_ids = encodings[:, :-1]
@@ -189,15 +188,19 @@ class SparkHFWorker(SparkWorker):
         self.model = self.loader.from_pretrained(config, local_files_only=True)
         self.model.compile(optimizer=get_optimizer(self.master_optimizer),
                            loss=self.master_loss, metrics=self.master_metrics)
-        x_train = self.tokenizer(list(x_train), padding=True, truncation=True, return_tensors="tf")
-
         weights_before_training = self.model.get_weights()
         if self.loader.__name__ == "TFAutoModelForSequenceClassification":
             # TODO: would be nice to have a better way to check if the model is a sequence classification model
+            x_train, y_train = zip(*data_iterator)
+            x_train = self.tokenizer(list(x_train), padding=True, truncation=True, return_tensors="tf")
+            y_train = np.array(y_train)
             history = self.model.fit(dict(x_train), y_train, **self.train_config)
-        else:
-            x_train, y_train = prepare_labels(x_train['input_ids'])
+        elif self.loader.__name__ == "TFAutoModelForCausalLM":
+            x_train = self.tokenizer(list(data_iterator), padding=True, truncation=True, return_tensors="tf")
+            x_train, y_train = x_train['input_ids'][:, :-1], x_train['input_ids'][:, 1:]
             history = self.model.fit(x_train, y_train, **self.train_config)
+        else:
+            raise ValueError(f"Unsupported loader type: {self.loader.__name__}")
 
         weights_after_training = self.model.get_weights()
         deltas = subtract_params(

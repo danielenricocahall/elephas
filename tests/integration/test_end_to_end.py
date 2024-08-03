@@ -215,7 +215,7 @@ def test_training_huggingface_classification(spark_context):
     model = TFAutoModelForSequenceClassification.from_pretrained(model_name, num_labels=len(np.unique(y_encoded)))
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     model.compile(optimizer=SGD(), loss='sparse_categorical_crossentropy', metrics=['accuracy'])
-    spark_model = SparkHFModel(model, num_workers=num_workers, mode=Mode.SYNCHRONOUS, tokenizer=tokenizer)
+    spark_model = SparkHFModel(model, num_workers=num_workers, mode=Mode.SYNCHRONOUS, tokenizer=tokenizer, loader=TFAutoModelForSequenceClassification)
 
     spark_model.fit(rdd, epochs=epochs, batch_size=batch_size)
 
@@ -227,24 +227,28 @@ def test_training_huggingface_classification(spark_context):
 
 
 def test_training_huggingface_generation(spark_context):
+    batch_size = 5
+    epochs = 1
+    num_workers = 2
+
     newsgroups = fetch_20newsgroups(subset='train')
     x = newsgroups.data[:60]  # Limit the data size for the test
-    y = newsgroups.target[:60]
 
-    encoder = LabelEncoder()
-    y_encoded = encoder.fit_transform(y)
+    # split data
+    x_train, x_test = train_test_split(x, test_size=0.2)
 
-    x_train, x_test, y_train, y_test = train_test_split(x, y_encoded, test_size=0.2)
-
-    model_name = 'distilgpt2'  # use the smaller generative model for testing
+    model_name = 'sshleifer/tiny-gpt2'  # use the smaller generative model for testing
 
     model = TFAutoModelForCausalLM.from_pretrained(model_name)
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     tokenizer.pad_token = tokenizer.eos_token
 
-    rdd = to_simple_rdd(spark_context, x_train, y_train)
+    model.compile(optimizer=SGD(), metrics=['accuracy'], loss='sparse_categorical_crossentropy')
 
-    model.compile(optimizer=SGD(), metrics=['accuracy'])
-
-    spark_model = SparkHFModel(model, num_workers=2, mode=Mode.SYNCHRONOUS, tokenizer=tokenizer)
-    spark_model.fit(rdd, epochs=1, batch_size=5)
+    spark_model = SparkHFModel(model, num_workers=num_workers, mode=Mode.SYNCHRONOUS, tokenizer=tokenizer, loader=TFAutoModelForCausalLM)
+    rdd = spark_context.parallelize(x_train)
+    rdd_test = spark_context.parallelize(x_test)
+    spark_model.fit(rdd, epochs=epochs, batch_size=batch_size)
+    generations = spark_model.generate(rdd_test, tokenizer_kwargs={"max_length": 15}, max_length=20, num_return_sequences=1)
+    generated_texts = [tokenizer.decode(output, skip_special_tokens=True) for output in generations]
+    print(generated_texts)
