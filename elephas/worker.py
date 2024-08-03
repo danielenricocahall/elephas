@@ -6,7 +6,6 @@ from pyspark import SparkFiles
 from tensorflow.keras.models import model_from_json
 from tensorflow.keras.optimizers import get as get_optimizer
 from tensorflow.python.keras.utils.generic_utils import slice_arrays
-from transformers import TFAutoModelForSequenceClassification
 
 from .enums.frequency import Frequency
 from .utils import subtract_params

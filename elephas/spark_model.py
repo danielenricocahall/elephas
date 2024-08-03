@@ -1,10 +1,8 @@
 import json
 import logging
-import os
 import shutil
 import subprocess
 import tempfile
-from time import sleep
 from uuid import uuid4
 from pathlib import Path
 from copy import deepcopy
@@ -21,7 +19,6 @@ from tensorflow.keras.models import load_model
 from tensorflow.keras.models import model_from_json
 from tensorflow.keras.optimizers import get as get_optimizer
 from tensorflow.keras.optimizers import serialize as serialize_optimizer, deserialize as deserialize_optimizer
-from transformers import TFAutoModelForSequenceClassification, AutoTokenizer, TFAutoModel
 
 from .enums.frequency import Frequency
 from .enums.modes import Mode
@@ -335,17 +332,16 @@ class SparkMLlibModel(SparkModel):
         """Train an elephas model on an RDD of LabeledPoints
         """
         rdd = lp_to_simple_rdd(labeled_points, categorical, nb_classes)
-        rdd = rdd.repartition(self.num_workers)
-        self._fit(rdd=rdd, epochs=epochs, batch_size=batch_size,
+        super().fit(rdd=rdd, epochs=epochs, batch_size=batch_size,
                   verbose=verbose, validation_split=validation_split)
 
     def predict(self, mllib_data):
         """Predict probabilities for an RDD of features
         """
         if isinstance(mllib_data, pyspark.mllib.linalg.Matrix):
-            return to_matrix(self._master_network.predict(from_matrix(mllib_data)))
+            return to_matrix(self.predict(from_matrix(mllib_data)))
         elif isinstance(mllib_data, pyspark.mllib.linalg.Vector):
-            return to_vector(self._master_network.predict(from_vector(mllib_data)))
+            return to_vector(self.predict(from_vector(mllib_data)))
         else:
             raise ValueError(
                 'Provide either an MLLib matrix or vector, got {}'.format(mllib_data.__name__))
@@ -370,9 +366,13 @@ class SparkHFModel(SparkModel):
         :param batch_size: batch size used for training and inference
         :param port: port used in case of 'http' parameter server mode
         """
+        if mode in [Mode.ASYNCHRONOUS, Mode.HOGWILD]:
+            raise ValueError(f"Asynchronous and Hogwild modes are not supported for Hugging Face models yet - please "
+                             f"use {Mode.SYNCHRONOUS} mode.")
         super().__init__(model, mode=mode, frequency=frequency, parameter_server_mode=parameter_server_mode,
                          num_workers=num_workers, batch_size=batch_size, port=port, *args, **kwargs)
         if isinstance(tokenizer, str):
+            from transformers import AutoTokenizer
             self.tokenizer = AutoTokenizer.from_pretrained(tokenizer)
         else:
             self.tokenizer = tokenizer
@@ -407,6 +407,7 @@ class SparkHFModel(SparkModel):
 
     @property
     def tf_loader(self):
+        from transformers import TFAutoModelForSequenceClassification, TFAutoModel
         if LossModelTypeMapper().get_model_type(self._master_network.loss) == ModelType.CLASSIFICATION:
             loader = TFAutoModelForSequenceClassification
         else:
