@@ -264,22 +264,7 @@ class SparkModel:
                 data = np.hsplit(data, len(model.input_shape))
             return zip(model.predict(data), indices)
 
-        if self.num_workers and self.num_workers > 1:
-            # if there are multiple workers, we need to retrieve element indices and preserve them throughout
-            # the inference process, since we'll need to sort by index before returning the result, as repartitioning
-            # does not preserve ordering, but the users will expect prediction results which correspond to the ordering
-            # of samples they supplied.
-            rdd = rdd.zipWithIndex()
-            rdd = rdd.repartition(self.num_workers)
-            predictions_and_indices = rdd.mapPartitions(partial(_predict_with_indices, json_model, custom_objs))
-            predictions_sorted_by_index = predictions_and_indices.sortBy(lambda x: x[1])
-            predictions = predictions_sorted_by_index.map(lambda x: x[0]).collect()
-        else:
-            # if there are no workers specified or only a single worker, we don't need to worry about handling index
-            # values, since there will be no shuffling
-            predictions = rdd.mapPartitions(partial(_predict, json_model, custom_objs)).collect()
-
-        return predictions
+        return self._predict_and_collect(rdd, partial(_predict, json_model, custom_objs), partial(_predict_with_indices, json_model, custom_objs))
 
     def _evaluate(self, rdd: RDD, **kwargs) -> Union[List[float], float]:
         """Private distributed evaluate method called by public evaluate method, after data has been verified to be an RDD"""
@@ -322,6 +307,17 @@ class SparkModel:
         avg_metrics = [agg_metric / number_of_samples for agg_metric in agg_metrics]
         # return loss and list of metrics if there are metrics, otherwise just return the scalar loss
         return [avg_loss, *avg_metrics] if avg_metrics else avg_loss
+
+    def _predict_and_collect(self, rdd: RDD, predict_func: Callable, predict_with_indices_func: Callable) -> List[np.ndarray]:
+        if self.num_workers and self.num_workers > 1:
+            rdd = rdd.zipWithIndex()
+            rdd = rdd.repartition(self.num_workers)
+            predictions_and_indices = rdd.mapPartitions(partial(predict_with_indices_func))
+            predictions_sorted_by_index = predictions_and_indices.sortBy(lambda x: x[1])
+            predictions = predictions_sorted_by_index.map(lambda x: x[0]).collect()
+        else:
+            predictions = rdd.mapPartitions(partial(predict_func)).collect()
+        return predictions
 
 
 class SparkMLlibModel(SparkModel):
@@ -440,11 +436,22 @@ class SparkHFModel(SparkModel):
                 shutil.rmtree(model_dir)
                 return predictions
 
-            if self.num_workers and self.num_workers > 1:
-                # TODO: Consider giving this the treatment of the other `_predict` method in the base `SparkModel` class
-                # as the ordering of the predictions may not be preserved here
-                rdd = rdd.repartition(self.num_workers)
-            return rdd.mapPartitions(_predict).collect()
+            def _predict_with_indices(partition):
+                data, indices = zip(*partition)
+                zip_path = SparkFiles.get(_zip_path)
+                model_dir = tempfile.mkdtemp()
+
+                shutil.unpack_archive(zip_path, model_dir)
+
+                model = loader.from_pretrained(model_dir, local_files_only=True)
+                predictions = []
+                for batch in data:
+                    inputs = tokenizer(batch, padding=True, truncation=True, return_tensors="tf")
+                    outputs = model(**inputs)
+                    predictions.extend(outputs.logits.numpy())
+                return zip(predictions, indices)
+
+            return self._predict_and_collect(rdd, _predict, _predict_with_indices)
 
     def _evaluate(self, rdd: RDD, **kwargs) -> List[np.ndarray]:
         """

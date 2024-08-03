@@ -10,8 +10,7 @@ from sklearn.preprocessing import LabelEncoder
 from tensorflow.keras.optimizers.legacy import SGD
 from tensorflow.keras import Input
 from tensorflow.keras.layers import Embedding, Flatten, Dot
-from transformers import AutoTokenizer, TFAutoModelForSequenceClassification, TFGPT2LMHeadModel, GPT2Tokenizer, \
-    TFAutoModel, TFGPT2Model
+from transformers import AutoTokenizer, TFAutoModelForSequenceClassification, TFAutoModelForCausalLM
 
 from elephas.enums.modes import Mode
 from elephas.enums.frequency import Frequency
@@ -207,7 +206,7 @@ def test_training_huggingface_classification(spark_context):
     encoder = LabelEncoder()
     y_encoded = encoder.fit_transform(y)
 
-    x_train, x_test, y_train, y_test = train_test_split(x, y_encoded, test_size=0.2)
+    x_train, x_test, y_train, y_test = train_test_split(x, y_encoded, test_size=0.5)
 
     model_name = 'albert-base-v2'  # use the smallest classification model for testing
 
@@ -215,7 +214,6 @@ def test_training_huggingface_classification(spark_context):
 
     model = TFAutoModelForSequenceClassification.from_pretrained(model_name, num_labels=len(np.unique(y_encoded)))
     tokenizer = AutoTokenizer.from_pretrained(model_name)
-
     model.compile(optimizer=SGD(), loss='sparse_categorical_crossentropy', metrics=['accuracy'])
     spark_model = SparkHFModel(model, num_workers=num_workers, mode=Mode.SYNCHRONOUS, tokenizer=tokenizer)
 
@@ -223,10 +221,9 @@ def test_training_huggingface_classification(spark_context):
 
     # Run inference on trained Spark model
     predictions = spark_model.predict(spark_context.parallelize(x_test))
-
-    y_pred = [np.argmax(pred) for pred in predictions]
-    accuracy = np.mean([pred == true for pred, true in zip(y_pred, y_test)])
-    print("Test Accuracy:", accuracy)
+    samples = tokenizer(x_test, padding=True, truncation=True, return_tensors="tf")
+    # Evaluate results
+    assert all(np.isclose(x, y, 0.01).all() for x, y in zip(predictions, spark_model.master_network(**samples)[0]))
 
 
 def test_training_huggingface_generation(spark_context):
@@ -241,7 +238,7 @@ def test_training_huggingface_generation(spark_context):
 
     model_name = 'distilgpt2'  # use the smaller generative model for testing
 
-    model = TFAutoModel.from_pretrained(model_name)
+    model = TFAutoModelForCausalLM.from_pretrained(model_name)
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     tokenizer.pad_token = tokenizer.eos_token
 
