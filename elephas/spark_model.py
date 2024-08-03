@@ -308,7 +308,7 @@ class SparkModel:
         # return loss and list of metrics if there are metrics, otherwise just return the scalar loss
         return [avg_loss, *avg_metrics] if avg_metrics else avg_loss
 
-    def predict_and_collect(self, rdd: RDD, predict_func: Callable, predict_with_indices_func: Callable):
+    def _predict_and_collect(self, rdd: RDD, predict_func: Callable, predict_with_indices_func: Callable) -> List[np.ndarray]:
         if self.num_workers and self.num_workers > 1:
             rdd = rdd.zipWithIndex()
             rdd = rdd.repartition(self.num_workers)
@@ -454,7 +454,7 @@ class SparkHFModel(SparkModel):
                     predictions.extend(outputs.logits.numpy())
                 return zip(predictions, indices)
 
-            return self.predict_and_collect(rdd, _predict, _predict_with_indices)
+            return self._predict_and_collect(rdd, _predict, _predict_with_indices)
 
     def _evaluate(self, rdd: RDD, **kwargs) -> List[np.ndarray]:
         """
