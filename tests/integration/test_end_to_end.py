@@ -206,7 +206,7 @@ def test_training_huggingface_classification(spark_context):
     encoder = LabelEncoder()
     y_encoded = encoder.fit_transform(y)
 
-    x_train, x_test, y_train, y_test = train_test_split(x, y_encoded, test_size=0.2)
+    x_train, x_test, y_train, y_test = train_test_split(x, y_encoded, test_size=0.5)
 
     model_name = 'albert-base-v2'  # use the smallest classification model for testing
 
@@ -221,9 +221,7 @@ def test_training_huggingface_classification(spark_context):
 
     # Run inference on trained Spark model
     predictions = spark_model.predict(spark_context.parallelize(x_test))
-
-
+    samples = tokenizer(x_test, padding=True, truncation=True, return_tensors="tf")
     # Evaluate results
-    y_pred = [np.argmax(pred) for pred in predictions]
-    accuracy = np.mean([pred == true for pred, true in zip(y_pred, y_test)])
-    print("Test Accuracy:", accuracy)
+    assert all(np.isclose(x, y, 0.01).all() for x, y in zip(predictions, spark_model.master_network(**samples)[0]))
+
