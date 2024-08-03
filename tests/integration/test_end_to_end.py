@@ -230,22 +230,24 @@ def test_training_huggingface_classification(spark_context):
 
 
 def test_training_huggingface_generation(spark_context):
-    batch_size = 2
-    epochs = 1
-    num_workers = 2
-
     newsgroups = fetch_20newsgroups(subset='train')
-    x = newsgroups.data[:50]  # Limit the data size for the test
+    x = newsgroups.data[:60]  # Limit the data size for the test
+    y = newsgroups.target[:60]
 
-    x_train, x_test = train_test_split(x, test_size=0.2)
+    encoder = LabelEncoder()
+    y_encoded = encoder.fit_transform(y)
+
+    x_train, x_test, y_train, y_test = train_test_split(x, y_encoded, test_size=0.2)
 
     model_name = 'distilgpt2'  # use the smaller generative model for testing
 
-    rdd = spark_context.parallelize(x_train)
     model = TFAutoModel.from_pretrained(model_name)
     tokenizer = AutoTokenizer.from_pretrained(model_name)
+    tokenizer.pad_token = tokenizer.eos_token
 
-    model.compile(optimizer=SGD(), loss=model.compute_loss, metrics=['accuracy'])
+    rdd = to_simple_rdd(spark_context, x_train, y_train)
 
-    spark_model = SparkHFModel(model, num_workers=num_workers, mode=Mode.SYNCHRONOUS, tokenizer=tokenizer)
-    spark_model.fit(rdd, epochs=epochs, batch_size=batch_size)
+    model.compile(optimizer=SGD(), metrics=['accuracy'])
+
+    spark_model = SparkHFModel(model, num_workers=2, mode=Mode.SYNCHRONOUS, tokenizer=tokenizer)
+    spark_model.fit(rdd, epochs=1, batch_size=5)

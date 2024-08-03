@@ -6,6 +6,7 @@ from pyspark import SparkFiles
 from tensorflow.keras.models import model_from_json
 from tensorflow.keras.optimizers import get as get_optimizer
 from tensorflow.python.keras.utils.generic_utils import slice_arrays
+from transformers import TFAutoModelForSequenceClassification, TFAutoModelForCausalLM
 
 from .enums.frequency import Frequency
 from .utils import subtract_params
@@ -171,22 +172,33 @@ class SparkHFWorker(SparkWorker):
         self.temp_dir = temp_dir
         self.loader = loader
 
+
     def train(self, data_iterator):
         """Train a Huggingface model on a worker
         """
         temp_dir = self.temp_dir.value
         config = SparkFiles.get(temp_dir)
+
         x_train, y_train = zip(*data_iterator)
 
-        self.model = self.loader.from_pretrained(config)
+        def prepare_labels(encodings):
+            input_ids = encodings[:, :-1]
+            labels = encodings[:, 1:]
+            return input_ids, labels
+
+        self.model = self.loader.from_pretrained(config, local_files_only=True)
         self.model.compile(optimizer=get_optimizer(self.master_optimizer),
                            loss=self.master_loss, metrics=self.master_metrics)
-
         x_train = self.tokenizer(list(x_train), padding=True, truncation=True, return_tensors="tf")
-        y_train = np.array(y_train)
 
         weights_before_training = self.model.get_weights()
-        history = self.model.fit(dict(x_train), y_train, **self.train_config)
+        if self.loader.__name__ == "TFAutoModelForSequenceClassification":
+            # TODO: would be nice to have a better way to check if the model is a sequence classification model
+            history = self.model.fit(dict(x_train), y_train, **self.train_config)
+        else:
+            x_train, y_train = prepare_labels(x_train['input_ids'])
+            history = self.model.fit(x_train, y_train, **self.train_config)
+
         weights_after_training = self.model.get_weights()
         deltas = subtract_params(
             weights_before_training, weights_after_training)
