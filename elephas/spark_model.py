@@ -264,7 +264,7 @@ class SparkModel:
                 data = np.hsplit(data, len(model.input_shape))
             return zip(model.predict(data), indices)
 
-        return self.predict_and_collect(rdd, partial(_predict, json_model, custom_objs), partial(_predict_with_indices, json_model, custom_objs))
+        return self._predict_and_collect(rdd, partial(_predict, json_model, custom_objs), partial(_predict_with_indices, json_model, custom_objs))
 
     def _evaluate(self, rdd: RDD, **kwargs) -> Union[List[float], float]:
         """Private distributed evaluate method called by public evaluate method, after data has been verified to be an RDD"""
