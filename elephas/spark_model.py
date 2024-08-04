@@ -395,6 +395,7 @@ class SparkHFModel(SparkModel):
 
             worker = SparkHFWorker(None, None, train_config,
                                    optimizer, loss, metrics, custom, temp_dir=temp_dir, tokenizer=self.tokenizer,
+                                   tokenizer_kwargs=self.tokenizer_kwargs,
                                    loader=self.tf_loader)
             training_outcomes = rdd.mapPartitions(worker.train).collect()
             new_parameters = self._master_network.get_weights()
