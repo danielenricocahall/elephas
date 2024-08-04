@@ -174,6 +174,11 @@ class SparkHFWorker(SparkWorker):
     def train(self, data_iterator):
         """Train a Huggingface model on a worker
         """
+<<<<<<< Updated upstream
+=======
+        from transformers import TFAutoModelForSequenceClassification, TFAutoModelForCausalLM, TFAutoModelForTokenClassification
+
+>>>>>>> Stashed changes
         temp_dir = self.temp_dir.value
         config = SparkFiles.get(temp_dir)
         x_train, y_train = zip(*data_iterator)
@@ -181,6 +186,25 @@ class SparkHFWorker(SparkWorker):
         self.model = self.loader.from_pretrained(config, local_files_only=True)
         self.model.compile(optimizer=get_optimizer(self.master_optimizer),
                            loss=self.master_loss, metrics=self.master_metrics)
+<<<<<<< Updated upstream
+=======
+        weights_before_training = self.model.get_weights()
+        if self.loader.__name__ in (TFAutoModelForSequenceClassification.__name__, TFAutoModelForTokenClassification.__name__):
+            # TODO: would be nice to have a better way to check if the model is a sequence classification model
+            x_train, y_train = zip(*data_iterator)
+            x_train = self.tokenizer(list(x_train), **self.tokenizer_kwargs, return_tensors="tf")
+            max_length = max(len(seq) for seq in x_train['input_ids'])
+            y_train_padded = process_labels(y_train, max_length, -100)
+
+            y_train = np.array(y_train_padded)
+            history = self.model.fit(dict(x_train), y_train, **self.train_config)
+        elif self.loader.__name__ == TFAutoModelForCausalLM.__name__:
+            x_train = self.tokenizer(list(data_iterator), **self.tokenizer_kwargs, return_tensors="tf")
+            x_train, y_train = x_train['input_ids'][:, :-1], x_train['input_ids'][:, 1:]
+            history = self.model.fit(x_train, y_train, **self.train_config)
+        else:
+            raise ValueError(f"Unsupported loader type: {self.loader.__name__}")
+>>>>>>> Stashed changes
 
         x_train = self.tokenizer(list(x_train), padding=True, truncation=True, return_tensors="tf")
         y_train = np.array(y_train)
@@ -196,4 +220,13 @@ class SparkHFWorker(SparkWorker):
             yield [deltas, None]
 
 
+<<<<<<< Updated upstream
 
+=======
+def process_labels(labels, max_length, pad_token_label_id):
+    processed_labels = []
+    for label_seq in labels:
+        padded_seq = label_seq + [pad_token_label_id] * (max_length - len(label_seq))
+        processed_labels.append(padded_seq)
+    return np.array(processed_labels)
+>>>>>>> Stashed changes
