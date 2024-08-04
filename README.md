@@ -307,7 +307,7 @@ In this example an ensemble of 10 models is built, based on optimization of at m
 
 
 ## Hugging Face Models Training and Inference
-As of 6.0.0, Elephas now supports distributed training (and inference) with [HuggingFace](https://huggingface.co/) models (using the Tensorflow/Keras backend), currently for classification only and in the `"synchronous"` training mode. In future releases, we hope to expand this to other types of models (e.g; generative) and the `"asynchronous"` and `"hogwild"` training modes. This can be accomplished using the `SparkHFModel`:
+As of 6.0.0, Elephas now supports distributed training (and inference) with [HuggingFace](https://huggingface.co/) models (using the Tensorflow/Keras backend), currently for text classification and causal langugage modeling only, and in the `"synchronous"` training mode. In future releases, we hope to expand this to other types of models and the `"asynchronous"` and `"hogwild"` training modes. This can be accomplished using the `SparkHFModel`:
 
 ```python 
 from elephas.spark_model import SparkHFModel
@@ -345,7 +345,7 @@ spark_model.fit(rdd, epochs=epochs, batch_size=batch_size)
 # Run inference on trained Spark model
 predictions = spark_model.predict(spark_context.parallelize(x_test))
 ```
-
+More examples can be seen in the `examples` directory, namely `"hf_causal_modeling.py"` and `"hf_text_classification.py"`.
 
 The computational model is the same as for Keras models, except the model is serialized and deserialized differently due to differences in the HuggingFace API. 
 
