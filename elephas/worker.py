@@ -6,7 +6,6 @@ from pyspark import SparkFiles
 from tensorflow.keras.models import model_from_json
 from tensorflow.keras.optimizers import get as get_optimizer
 from tensorflow.python.keras.utils.generic_utils import slice_arrays
-from transformers import TFAutoModelForSequenceClassification, TFAutoModelForCausalLM
 
 from .enums.frequency import Frequency
 from .utils import subtract_params
@@ -167,35 +166,30 @@ class SparkHFWorker(SparkWorker):
     def __init__(self, json, parameters, train_config, master_optimizer,
                  master_loss, master_metrics, custom_objects, temp_dir, tokenizer, loader):
         super().__init__(json, parameters, train_config, master_optimizer,
-                 master_loss, master_metrics, custom_objects)
+                         master_loss, master_metrics, custom_objects)
         self.tokenizer = tokenizer
         self.temp_dir = temp_dir
         self.loader = loader
 
-
     def train(self, data_iterator):
         """Train a Huggingface model on a worker
         """
+        from transformers import TFAutoModelForSequenceClassification, TFAutoModelForCausalLM
+
         temp_dir = self.temp_dir.value
         config = SparkFiles.get(temp_dir)
-
-
-        def prepare_labels(encodings):
-            input_ids = encodings[:, :-1]
-            labels = encodings[:, 1:]
-            return input_ids, labels
 
         self.model = self.loader.from_pretrained(config, local_files_only=True)
         self.model.compile(optimizer=get_optimizer(self.master_optimizer),
                            loss=self.master_loss, metrics=self.master_metrics)
         weights_before_training = self.model.get_weights()
-        if self.loader.__name__ == "TFAutoModelForSequenceClassification":
+        if self.loader.__name__ == TFAutoModelForSequenceClassification.__name__:
             # TODO: would be nice to have a better way to check if the model is a sequence classification model
             x_train, y_train = zip(*data_iterator)
             x_train = self.tokenizer(list(x_train), padding=True, truncation=True, return_tensors="tf")
             y_train = np.array(y_train)
             history = self.model.fit(dict(x_train), y_train, **self.train_config)
-        elif self.loader.__name__ == "TFAutoModelForCausalLM":
+        elif self.loader.__name__ == TFAutoModelForCausalLM.__name__:
             x_train = self.tokenizer(list(data_iterator), padding=True, truncation=True, return_tensors="tf")
             x_train, y_train = x_train['input_ids'][:, :-1], x_train['input_ids'][:, 1:]
             history = self.model.fit(x_train, y_train, **self.train_config)
@@ -209,6 +203,3 @@ class SparkHFWorker(SparkWorker):
             yield [deltas, history.history]
         else:
             yield [deltas, None]
-
-
-
