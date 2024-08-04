@@ -216,9 +216,9 @@ def test_training_huggingface_classification(spark_context):
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     tokenizer_kwargs = {'padding': True, 'truncation': True}
 
-
     model.compile(optimizer=SGD(), loss='sparse_categorical_crossentropy', metrics=['accuracy'])
-    spark_model = SparkHFModel(model, num_workers=num_workers, mode=Mode.SYNCHRONOUS, tokenizer=tokenizer, tokenizer_kwargs=tokenizer_kwargs, loader=TFAutoModelForSequenceClassification)
+    spark_model = SparkHFModel(model, num_workers=num_workers, mode=Mode.SYNCHRONOUS, tokenizer=tokenizer,
+                               tokenizer_kwargs=tokenizer_kwargs, loader=TFAutoModelForSequenceClassification)
 
     spark_model.fit(rdd, epochs=epochs, batch_size=batch_size)
 
@@ -247,11 +247,14 @@ def test_training_huggingface_generation(spark_context):
 
     model.compile(optimizer=SGD(), metrics=['accuracy'], loss='sparse_categorical_crossentropy')
 
-    spark_model = SparkHFModel(model, num_workers=num_workers, mode=Mode.SYNCHRONOUS, tokenizer=tokenizer, tokenizer_kwargs=tokenizer_kwargs, loader=TFAutoModelForCausalLM)
+    spark_model = SparkHFModel(model, num_workers=num_workers, mode=Mode.SYNCHRONOUS, tokenizer=tokenizer,
+                               tokenizer_kwargs=tokenizer_kwargs, loader=TFAutoModelForCausalLM)
     rdd = spark_context.parallelize(x_train)
     rdd_test = spark_context.parallelize(x_test)
     spark_model.fit(rdd, epochs=epochs, batch_size=batch_size)
     generations = spark_model.generate(rdd_test, max_length=20, num_return_sequences=1)
     generated_texts = [tokenizer.decode(output, skip_special_tokens=True) for output in generations]
-    assert generated_texts == [tokenizer.decode(output, skip_special_tokens=True) for output in spark_model.master_network.generate(**tokenizer(x_test, max_length=15, padding=True, truncation=True, return_tensors="tf"), num_return_sequences=1)]
-
+    assert generated_texts == [tokenizer.decode(output, skip_special_tokens=True) for output in
+                               spark_model.master_network.generate(
+                                   **tokenizer(x_test, max_length=15, padding=True, truncation=True,
+                                               return_tensors="tf"), num_return_sequences=1)]
