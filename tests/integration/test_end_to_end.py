@@ -232,9 +232,8 @@ def test_training_huggingface_generation(spark_context):
     num_workers = 2
 
     newsgroups = fetch_20newsgroups(subset='train')
-    x = newsgroups.data[:60]  # Limit the data size for the test
+    x = newsgroups.data[:60]
 
-    # split data
     x_train, x_test = train_test_split(x, test_size=0.2)
 
     model_name = 'sshleifer/tiny-gpt2'  # use the smaller generative model for testing
@@ -251,4 +250,5 @@ def test_training_huggingface_generation(spark_context):
     spark_model.fit(rdd, epochs=epochs, batch_size=batch_size)
     generations = spark_model.generate(rdd_test, tokenizer_kwargs={"max_length": 15}, max_length=20, num_return_sequences=1)
     generated_texts = [tokenizer.decode(output, skip_special_tokens=True) for output in generations]
-    print(generated_texts)
+    assert generated_texts == [tokenizer.decode(output, skip_special_tokens=True) for output in spark_model.master_network.generate(**tokenizer(x_test, max_length=15, padding=True, truncation=True, return_tensors="tf"), num_return_sequences=1)]
+
