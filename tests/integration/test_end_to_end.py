@@ -243,7 +243,8 @@ def test_training_huggingface_generation(spark_context):
 
     model = TFAutoModelForCausalLM.from_pretrained(model_name)
     tokenizer = AutoTokenizer.from_pretrained(model_name)
-    tokenizer_kwargs = {'max_length': 15, 'padding': True, 'truncation': True, 'eos_token': tokenizer.eos_token}
+    tokenizer.pad_token = tokenizer.eos_token
+    tokenizer_kwargs = {'max_length': 15, 'padding': True, 'truncation': True}
 
     model.compile(optimizer=SGD(), metrics=['accuracy'], loss='sparse_categorical_crossentropy')
 
