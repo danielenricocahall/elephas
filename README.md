@@ -337,12 +337,13 @@ rdd = to_simple_rdd(spark_context, x_train, y_train)
 
 model = TFAutoModelForSequenceClassification.from_pretrained(model_name, num_labels=len(np.unique(y_encoded)))
 tokenizer = AutoTokenizer.from_pretrained(model_name)
+tokenizer_kwargs = {'padding': True, 'truncation': True, ...}
+
 model.compile(optimizer=SGD(), loss='sparse_categorical_crossentropy', metrics=['accuracy'])
-spark_model = SparkHFModel(model, num_workers=num_workers, mode="synchronous", tokenizer=tokenizer)
+spark_model = SparkHFModel(model, num_workers=num_workers, mode="synchronous", tokenizer=tokenizer, tokenizer_kwargs=tokenizer_kwargs, loader=TFAutoModelForSequenceClassification)
 
 spark_model.fit(rdd, epochs=epochs, batch_size=batch_size)
 
-# Run inference on trained Spark model
 predictions = spark_model.predict(spark_context.parallelize(x_test))
 ```
 More examples can be seen in the `examples` directory, namely `"hf_causal_modeling.py"` and `"hf_text_classification.py"`.
