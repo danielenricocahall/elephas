@@ -348,7 +348,7 @@ class SparkMLlibModel(SparkModel):
 class SparkHFModel(SparkModel):
     def __init__(self, model, mode=Mode.ASYNCHRONOUS,
                  frequency=Frequency.EPOCH,
-                 parameter_server_mode='http', num_workers=None, batch_size=32, port=4000, tokenizer=None, loader=None,
+                 parameter_server_mode='http', num_workers=None, batch_size=32, port=4000, tokenizer=None, tokenizer_kwargs=None, loader=None,
                  *args,
                  **kwargs):
         """
@@ -376,6 +376,7 @@ class SparkHFModel(SparkModel):
         else:
             self.tokenizer = tokenizer
         self.tf_loader = loader
+        self.tokenizer_kwargs = tokenizer_kwargs or {}
 
     def _fit(self, rdd: RDD, **kwargs):
         """
@@ -411,6 +412,7 @@ class SparkHFModel(SparkModel):
         """
         tokenizer = self.tokenizer
         loader = self.tf_loader
+        tokenizer_kwargs = self.tokenizer_kwargs
         with tempfile.TemporaryDirectory() as temp_dir:
             _zip_path = save_and_zip_model(self._master_network, temp_dir)
             rdd.context.addFile(_zip_path)
@@ -425,7 +427,7 @@ class SparkHFModel(SparkModel):
 
                 predictions = []
                 for batch in partition:
-                    inputs = tokenizer(batch, padding=True, truncation=True, return_tensors="tf")
+                    inputs = tokenizer(batch, **tokenizer_kwargs, return_tensors="tf")
                     outputs = model(**inputs)
                     predictions.extend(outputs.logits.numpy())
                 shutil.rmtree(model_dir)
@@ -441,7 +443,7 @@ class SparkHFModel(SparkModel):
                 model = loader.from_pretrained(model_dir, local_files_only=True)
                 predictions = []
                 for batch in data:
-                    inputs = tokenizer(batch, padding=True, truncation=True, return_tensors="tf")
+                    inputs = tokenizer(batch, **tokenizer_kwargs, return_tensors="tf")
                     outputs = model(**inputs)
                     predictions.extend(outputs.logits.numpy())
                 return zip(predictions, indices)
@@ -476,7 +478,7 @@ class SparkHFModel(SparkModel):
             raise ValueError("This method is only for causal language models, not classification models.")
         tokenizer = self.tokenizer
         loader = self.tf_loader
-        tokenizer_kwargs = kwargs.pop("tokenizer_kwargs", {})
+        tokenizer_kwargs = self.tokenizer_kwargs
         with tempfile.TemporaryDirectory() as temp_dir:
             _zip_path = save_and_zip_model(self._master_network, temp_dir)
             rdd.context.addFile(_zip_path)
@@ -491,7 +493,7 @@ class SparkHFModel(SparkModel):
 
                 generations = []
                 for batch in partition:
-                    inputs = tokenizer(batch, padding=True, truncation=True, return_tensors="tf", **tokenizer_kwargs)
+                    inputs = tokenizer(batch, **tokenizer_kwargs, return_tensors="tf")
                     outputs = model.generate(**inputs, **kwargs)
                     generations.extend(outputs)
                 shutil.rmtree(model_dir)
@@ -507,7 +509,7 @@ class SparkHFModel(SparkModel):
                 model = loader.from_pretrained(model_dir, local_files_only=True)
                 generations = []
                 for batch in data:
-                    inputs = tokenizer(batch, padding=True, truncation=True, return_tensors="tf", **tokenizer_kwargs)
+                    inputs = tokenizer(batch, **tokenizer_kwargs, return_tensors="tf")
                     outputs = model.generate(**inputs, **kwargs)
                     generations.extend(outputs)
                 return zip(generations, indices)
