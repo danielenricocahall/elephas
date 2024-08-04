@@ -164,29 +164,39 @@ class SparkHFWorker(SparkWorker):
     """Synchronous worker for Huggingface models"""
 
     def __init__(self, json, parameters, train_config, master_optimizer,
-                 master_loss, master_metrics, custom_objects, temp_dir, tokenizer, loader):
+                 master_loss, master_metrics, custom_objects, temp_dir, tokenizer, tokenizer_kwargs, loader):
         super().__init__(json, parameters, train_config, master_optimizer,
-                 master_loss, master_metrics, custom_objects)
+                         master_loss, master_metrics, custom_objects)
         self.tokenizer = tokenizer
+        self.tokenizer_kwargs = tokenizer_kwargs
         self.temp_dir = temp_dir
         self.loader = loader
 
     def train(self, data_iterator):
         """Train a Huggingface model on a worker
         """
+        from transformers import TFAutoModelForSequenceClassification, TFAutoModelForCausalLM
+
         temp_dir = self.temp_dir.value
         config = SparkFiles.get(temp_dir)
-        x_train, y_train = zip(*data_iterator)
 
         self.model = self.loader.from_pretrained(config, local_files_only=True)
         self.model.compile(optimizer=get_optimizer(self.master_optimizer),
                            loss=self.master_loss, metrics=self.master_metrics)
-
-        x_train = self.tokenizer(list(x_train), padding=True, truncation=True, return_tensors="tf")
-        y_train = np.array(y_train)
-
         weights_before_training = self.model.get_weights()
-        history = self.model.fit(dict(x_train), y_train, **self.train_config)
+        if self.loader.__name__ == TFAutoModelForSequenceClassification.__name__:
+            # TODO: would be nice to have a better way to check if the model is a sequence classification model
+            x_train, y_train = zip(*data_iterator)
+            x_train = self.tokenizer(list(x_train), **self.tokenizer_kwargs, return_tensors="tf")
+            y_train = np.array(y_train)
+            history = self.model.fit(dict(x_train), y_train, **self.train_config)
+        elif self.loader.__name__ == TFAutoModelForCausalLM.__name__:
+            x_train = self.tokenizer(list(data_iterator), **self.tokenizer_kwargs, return_tensors="tf")
+            x_train, y_train = x_train['input_ids'][:, :-1], x_train['input_ids'][:, 1:]
+            history = self.model.fit(x_train, y_train, **self.train_config)
+        else:
+            raise ValueError(f"Unsupported loader type: {self.loader.__name__}")
+
         weights_after_training = self.model.get_weights()
         deltas = subtract_params(
             weights_before_training, weights_after_training)
@@ -194,6 +204,3 @@ class SparkHFWorker(SparkWorker):
             yield [deltas, history.history]
         else:
             yield [deltas, None]
-
-
-

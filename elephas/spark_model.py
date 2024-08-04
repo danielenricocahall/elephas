@@ -264,7 +264,8 @@ class SparkModel:
                 data = np.hsplit(data, len(model.input_shape))
             return zip(model.predict(data), indices)
 
-        return self._predict_and_collect(rdd, partial(_predict, json_model, custom_objs), partial(_predict_with_indices, json_model, custom_objs))
+        return self._predict_and_collect(rdd, partial(_predict, json_model, custom_objs),
+                                         partial(_predict_with_indices, json_model, custom_objs))
 
     def _evaluate(self, rdd: RDD, **kwargs) -> Union[List[float], float]:
         """Private distributed evaluate method called by public evaluate method, after data has been verified to be an RDD"""
@@ -308,7 +309,8 @@ class SparkModel:
         # return loss and list of metrics if there are metrics, otherwise just return the scalar loss
         return [avg_loss, *avg_metrics] if avg_metrics else avg_loss
 
-    def _predict_and_collect(self, rdd: RDD, predict_func: Callable, predict_with_indices_func: Callable) -> List[np.ndarray]:
+    def _predict_and_collect(self, rdd: RDD, predict_func: Callable, predict_with_indices_func: Callable) -> List[
+        np.ndarray]:
         if self.num_workers and self.num_workers > 1:
             rdd = rdd.zipWithIndex()
             rdd = rdd.repartition(self.num_workers)
@@ -329,7 +331,7 @@ class SparkMLlibModel(SparkModel):
         """
         rdd = lp_to_simple_rdd(labeled_points, categorical, nb_classes)
         super().fit(rdd=rdd, epochs=epochs, batch_size=batch_size,
-                  verbose=verbose, validation_split=validation_split)
+                    verbose=verbose, validation_split=validation_split)
 
     def predict(self, mllib_data):
         """Predict probabilities for an RDD of features
@@ -346,7 +348,8 @@ class SparkMLlibModel(SparkModel):
 class SparkHFModel(SparkModel):
     def __init__(self, model, mode=Mode.ASYNCHRONOUS,
                  frequency=Frequency.EPOCH,
-                 parameter_server_mode='http', num_workers=None, batch_size=32, port=4000, tokenizer=None, *args,
+                 parameter_server_mode='http', num_workers=None, batch_size=32, port=4000, tokenizer=None, tokenizer_kwargs=None, loader=None,
+                 *args,
                  **kwargs):
         """
         SparkHFModel
@@ -372,6 +375,8 @@ class SparkHFModel(SparkModel):
             self.tokenizer = AutoTokenizer.from_pretrained(tokenizer)
         else:
             self.tokenizer = tokenizer
+        self.tf_loader = loader
+        self.tokenizer_kwargs = tokenizer_kwargs or {}
 
     def _fit(self, rdd: RDD, **kwargs):
         """
@@ -382,17 +387,15 @@ class SparkHFModel(SparkModel):
         metrics = self.master_metrics
         custom = self.custom_objects
         train_config = kwargs
-        init = self._master_network.get_weights()
-        parameters = rdd.context.broadcast(init)
-        model_json = self._master_network.config
 
         with tempfile.TemporaryDirectory() as temp_dir:
             self._master_network.save_pretrained(temp_dir)
             rdd.context.addFile(temp_dir, recursive=True)
             temp_dir = rdd.context.broadcast(temp_dir)
 
-            worker = SparkHFWorker(model_json, parameters, train_config,
+            worker = SparkHFWorker(None, None, train_config,
                                    optimizer, loss, metrics, custom, temp_dir=temp_dir, tokenizer=self.tokenizer,
+                                   tokenizer_kwargs=self.tokenizer_kwargs,
                                    loader=self.tf_loader)
             training_outcomes = rdd.mapPartitions(worker.train).collect()
             new_parameters = self._master_network.get_weights()
@@ -404,21 +407,13 @@ class SparkHFModel(SparkModel):
                 new_parameters = subtract_params(new_parameters, weighted_grad)
             self._master_network.set_weights(new_parameters)
 
-    @property
-    def tf_loader(self):
-        from transformers import TFAutoModelForSequenceClassification, TFAutoModel
-        if LossModelTypeMapper().get_model_type(self._master_network.loss) == ModelType.CLASSIFICATION:
-            loader = TFAutoModelForSequenceClassification
-        else:
-            loader = TFAutoModel
-        return loader
-
     def _predict(self, rdd: RDD) -> List[np.ndarray]:
         """
         Perform distributed inference with the Hugging Face model.
         """
         tokenizer = self.tokenizer
         loader = self.tf_loader
+        tokenizer_kwargs = self.tokenizer_kwargs
         with tempfile.TemporaryDirectory() as temp_dir:
             _zip_path = save_and_zip_model(self._master_network, temp_dir)
             rdd.context.addFile(_zip_path)
@@ -433,7 +428,7 @@ class SparkHFModel(SparkModel):
 
                 predictions = []
                 for batch in partition:
-                    inputs = tokenizer(batch, padding=True, truncation=True, return_tensors="tf")
+                    inputs = tokenizer(batch, **tokenizer_kwargs, return_tensors="tf")
                     outputs = model(**inputs)
                     predictions.extend(outputs.logits.numpy())
                 shutil.rmtree(model_dir)
@@ -449,7 +444,7 @@ class SparkHFModel(SparkModel):
                 model = loader.from_pretrained(model_dir, local_files_only=True)
                 predictions = []
                 for batch in data:
-                    inputs = tokenizer(batch, padding=True, truncation=True, return_tensors="tf")
+                    inputs = tokenizer(batch, **tokenizer_kwargs, return_tensors="tf")
                     outputs = model(**inputs)
                     predictions.extend(outputs.logits.numpy())
                 return zip(predictions, indices)
@@ -466,6 +461,61 @@ class SparkHFModel(SparkModel):
                      f"and there isn't a native `evaluate` method on HuggingFace models."
                      f" Maybe in a future release.")
         return []
+
+    def generate(self, data: Union[RDD, np.array], **kwargs) -> List[np.ndarray]:
+        """Perform distributed generation with the model"""
+        if isinstance(data, (np.ndarray,)):
+            from pyspark.sql import SparkSession
+            sc = SparkSession.builder.getOrCreate().sparkContext
+            data = sc.parallelize(data)
+        return self._generate(data, **kwargs)
+
+    def _generate(self, rdd: RDD, **kwargs) -> List[np.ndarray]:
+        """
+        Perform distributed generation with the Hugging Face model, for generative models
+        """
+        from transformers import TFAutoModelForSequenceClassification
+        if self.tf_loader.__name__ == TFAutoModelForSequenceClassification.__name__:
+            raise ValueError("This method is only for causal language models, not classification models.")
+        tokenizer = self.tokenizer
+        loader = self.tf_loader
+        tokenizer_kwargs = self.tokenizer_kwargs
+        with tempfile.TemporaryDirectory() as temp_dir:
+            _zip_path = save_and_zip_model(self._master_network, temp_dir)
+            rdd.context.addFile(_zip_path)
+
+            def _generate(partition):
+                zip_path = SparkFiles.get(_zip_path)
+                model_dir = tempfile.mkdtemp()
+
+                shutil.unpack_archive(zip_path, model_dir)
+
+                model = loader.from_pretrained(model_dir, local_files_only=True)
+
+                generations = []
+                for batch in partition:
+                    inputs = tokenizer(batch, **tokenizer_kwargs, return_tensors="tf")
+                    outputs = model.generate(**inputs, **kwargs)
+                    generations.extend(outputs)
+                shutil.rmtree(model_dir)
+                return generations
+
+            def _generate_with_indices(partition):
+                data, indices = zip(*partition)
+                zip_path = SparkFiles.get(_zip_path)
+                model_dir = tempfile.mkdtemp()
+
+                shutil.unpack_archive(zip_path, model_dir)
+
+                model = loader.from_pretrained(model_dir, local_files_only=True)
+                generations = []
+                for batch in data:
+                    inputs = tokenizer(batch, **tokenizer_kwargs, return_tensors="tf")
+                    outputs = model.generate(**inputs, **kwargs)
+                    generations.extend(outputs)
+                return zip(generations, indices)
+
+            return self._predict_and_collect(rdd, _generate, _generate_with_indices)
 
     def save(self, file_name: str, overwrite: bool = False, to_hadoop: bool = False):
         """
