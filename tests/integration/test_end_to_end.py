@@ -8,7 +8,7 @@ from pyspark.ml.feature import StringIndexer, VectorAssembler
 from sklearn.datasets import fetch_20newsgroups
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
-from tensorflow.keras.optimizers.legacy import SGD
+from tensorflow.keras.optimizers.legacy import Adam, SGD
 from tensorflow.keras import Input
 from tensorflow.keras.layers import Embedding, Flatten, Dot
 from transformers import AutoTokenizer, TFAutoModelForSequenceClassification, TFAutoModelForCausalLM, \
@@ -262,9 +262,10 @@ def test_training_huggingface_generation(spark_context):
                                    **tokenizer(x_test, max_length=15, padding=True, truncation=True,
                                                return_tensors="tf"), num_return_sequences=1)]
 
+
 def test_training_huggingface_token_classification(spark_context):
     batch_size = 5
-    epochs = 1
+    epochs = 2
     num_workers = 2
     model_name = 'albert-base-v2'  # use the smallest classification model for testing
 
@@ -291,6 +292,7 @@ def test_training_huggingface_token_classification(spark_context):
 
         tokenized_inputs["labels"] = labels
         return tokenized_inputs
+
     dataset = load_dataset("conll2003", split='train[:5%]', trust_remote_code=True)
     dataset = dataset.map(tokenize_and_align_labels, batched=True)
 
@@ -299,19 +301,18 @@ def test_training_huggingface_token_classification(spark_context):
 
     x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2)
 
-
     rdd = to_simple_rdd(spark_context, x_train, y_train)
 
     tokenizer_kwargs = {'padding': True, 'truncation': True, 'is_split_into_words': True}
 
-    model.compile(optimizer=SGD(), metrics=['accuracy'])
+    model.compile(optimizer=Adam(learning_rate=5e-5), metrics=['accuracy'])
     spark_model = SparkHFModel(model, num_workers=num_workers, mode=Mode.SYNCHRONOUS, tokenizer=tokenizer,
-                               tokenizer_kwargs=tokenizer_kwargs, loader=TFAutoModelForSequenceClassification)
+                               tokenizer_kwargs=tokenizer_kwargs, loader=TFAutoModelForTokenClassification)
 
     spark_model.fit(rdd, epochs=epochs, batch_size=batch_size)
 
     # Run inference on trained Spark model
     predictions = spark_model.predict(spark_context.parallelize(x_test))
-    samples = tokenizer(x_test, padding=True, truncation=True, return_tensors="tf")
+    samples = tokenizer(x_test, **tokenizer_kwargs, return_tensors="tf")
     # Evaluate results
     assert all(np.isclose(x, y, 0.01).all() for x, y in zip(predictions, spark_model.master_network(**samples)[0]))

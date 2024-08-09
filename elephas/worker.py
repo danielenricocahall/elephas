@@ -188,7 +188,10 @@ class SparkHFWorker(SparkWorker):
             # TODO: would be nice to have a better way to check if the model is a sequence classification model
             x_train, y_train = zip(*data_iterator)
             x_train = self.tokenizer(list(x_train), **self.tokenizer_kwargs, return_tensors="tf")
-            y_train = np.array(y_train)
+            max_length = max(len(seq) for seq in x_train['input_ids'])
+            y_train_padded = process_labels(y_train, max_length, -100)
+            y_train = np.array(y_train_padded)
+
             history = self.model.fit(dict(x_train), y_train, **self.train_config)
         elif self.loader.__name__ == TFAutoModelForCausalLM.__name__:
             x_train = self.tokenizer(list(data_iterator), **self.tokenizer_kwargs, return_tensors="tf")
@@ -204,3 +207,10 @@ class SparkHFWorker(SparkWorker):
             yield [deltas, history.history]
         else:
             yield [deltas, None]
+
+def process_labels(labels, max_length, pad_token_label_id):
+    processed_labels = []
+    for label_seq in labels:
+        padded_seq = label_seq + [pad_token_label_id] * (max_length - len(label_seq))
+        processed_labels.append(padded_seq)
+    return np.array(processed_labels)
