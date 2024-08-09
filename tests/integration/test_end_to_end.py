@@ -2,6 +2,7 @@ import os
 from itertools import count
 from math import isclose
 
+from datasets import load_dataset
 from keras import Model
 from pyspark.ml.feature import StringIndexer, VectorAssembler
 from sklearn.datasets import fetch_20newsgroups
@@ -10,13 +11,8 @@ from sklearn.preprocessing import LabelEncoder
 from tensorflow.keras.optimizers.legacy import SGD
 from tensorflow.keras import Input
 from tensorflow.keras.layers import Embedding, Flatten, Dot
-<<<<<<< Updated upstream
-from transformers import AutoTokenizer, TFAutoModelForSequenceClassification
-=======
-from datasets import load_dataset
 from transformers import AutoTokenizer, TFAutoModelForSequenceClassification, TFAutoModelForCausalLM, \
     TFAutoModelForTokenClassification
->>>>>>> Stashed changes
 
 from elephas.enums.modes import Mode
 from elephas.enums.frequency import Frequency
@@ -200,7 +196,7 @@ def test_multiple_input_model(spark_session, frequency):
     assert spark_model.evaluate(np.array(rdd_test_data.collect()), np.array(rdd_test_targets.collect()))
 
 
-def test_training_huggingface_text_classification(spark_context):
+def test_training_huggingface_classification(spark_context):
     batch_size = 5
     epochs = 1
     num_workers = 2
@@ -220,8 +216,11 @@ def test_training_huggingface_text_classification(spark_context):
 
     model = TFAutoModelForSequenceClassification.from_pretrained(model_name, num_labels=len(np.unique(y_encoded)))
     tokenizer = AutoTokenizer.from_pretrained(model_name)
+    tokenizer_kwargs = {'padding': True, 'truncation': True}
+
     model.compile(optimizer=SGD(), loss='sparse_categorical_crossentropy', metrics=['accuracy'])
-    spark_model = SparkHFModel(model, num_workers=num_workers, mode=Mode.SYNCHRONOUS, tokenizer=tokenizer)
+    spark_model = SparkHFModel(model, num_workers=num_workers, mode=Mode.SYNCHRONOUS, tokenizer=tokenizer,
+                               tokenizer_kwargs=tokenizer_kwargs, loader=TFAutoModelForSequenceClassification)
 
     spark_model.fit(rdd, epochs=epochs, batch_size=batch_size)
 
@@ -231,8 +230,37 @@ def test_training_huggingface_text_classification(spark_context):
     # Evaluate results
     assert all(np.isclose(x, y, 0.01).all() for x, y in zip(predictions, spark_model.master_network(**samples)[0]))
 
-<<<<<<< Updated upstream
-=======
+
+def test_training_huggingface_generation(spark_context):
+    batch_size = 5
+    epochs = 1
+    num_workers = 2
+
+    newsgroups = fetch_20newsgroups(subset='train')
+    x = newsgroups.data[:60]
+
+    x_train, x_test = train_test_split(x, test_size=0.2)
+
+    model_name = 'sshleifer/tiny-gpt2'  # use the smaller generative model for testing
+
+    model = TFAutoModelForCausalLM.from_pretrained(model_name)
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    tokenizer.pad_token = tokenizer.eos_token
+    tokenizer_kwargs = {'max_length': 15, 'padding': True, 'truncation': True}
+
+    model.compile(optimizer=SGD(), metrics=['accuracy'], loss='sparse_categorical_crossentropy')
+
+    spark_model = SparkHFModel(model, num_workers=num_workers, mode=Mode.SYNCHRONOUS, tokenizer=tokenizer,
+                               tokenizer_kwargs=tokenizer_kwargs, loader=TFAutoModelForCausalLM)
+    rdd = spark_context.parallelize(x_train)
+    rdd_test = spark_context.parallelize(x_test)
+    spark_model.fit(rdd, epochs=epochs, batch_size=batch_size)
+    generations = spark_model.generate(rdd_test, max_length=20, num_return_sequences=1)
+    generated_texts = [tokenizer.decode(output, skip_special_tokens=True) for output in generations]
+    assert generated_texts == [tokenizer.decode(output, skip_special_tokens=True) for output in
+                               spark_model.master_network.generate(
+                                   **tokenizer(x_test, max_length=15, padding=True, truncation=True,
+                                               return_tensors="tf"), num_return_sequences=1)]
 
 def test_training_huggingface_token_classification(spark_context):
     batch_size = 5
@@ -287,35 +315,3 @@ def test_training_huggingface_token_classification(spark_context):
     samples = tokenizer(x_test, padding=True, truncation=True, return_tensors="tf")
     # Evaluate results
     assert all(np.isclose(x, y, 0.01).all() for x, y in zip(predictions, spark_model.master_network(**samples)[0]))
-
-def test_training_huggingface_generation(spark_context):
-    batch_size = 5
-    epochs = 1
-    num_workers = 2
-
-    newsgroups = fetch_20newsgroups(subset='train')
-    x = newsgroups.data[:60]
-
-    x_train, x_test = train_test_split(x, test_size=0.2)
-
-    model_name = 'sshleifer/tiny-gpt2'  # use the smaller generative model for testing
-
-    model = TFAutoModelForCausalLM.from_pretrained(model_name)
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    tokenizer.pad_token = tokenizer.eos_token
-    tokenizer_kwargs = {'max_length': 15, 'padding': True, 'truncation': True}
-
-    model.compile(optimizer=SGD(), metrics=['accuracy'], loss='sparse_categorical_crossentropy')
-
-    spark_model = SparkHFModel(model, num_workers=num_workers, mode=Mode.SYNCHRONOUS, tokenizer=tokenizer,
-                               tokenizer_kwargs=tokenizer_kwargs, loader=TFAutoModelForCausalLM)
-    rdd = spark_context.parallelize(x_train)
-    rdd_test = spark_context.parallelize(x_test)
-    spark_model.fit(rdd, epochs=epochs, batch_size=batch_size)
-    generations = spark_model.generate(rdd_test, max_length=20, num_return_sequences=1)
-    generated_texts = [tokenizer.decode(output, skip_special_tokens=True) for output in generations]
-    assert generated_texts == [tokenizer.decode(output, skip_special_tokens=True) for output in
-                               spark_model.master_network.generate(
-                                   **tokenizer(x_test, max_length=15, padding=True, truncation=True,
-                                               return_tensors="tf"), num_return_sequences=1)]
->>>>>>> Stashed changes
