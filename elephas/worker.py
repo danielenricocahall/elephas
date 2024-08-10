@@ -184,14 +184,17 @@ class SparkHFWorker(SparkWorker):
         self.model.compile(optimizer=get_optimizer(self.master_optimizer),
                            loss=self.master_loss, metrics=self.master_metrics)
         weights_before_training = self.model.get_weights()
-        if self.loader.__name__ in (TFAutoModelForSequenceClassification.__name__, TFAutoModelForTokenClassification.__name__):
-            # TODO: would be nice to have a better way to check if the model is a sequence classification model
+        if self.loader.__name__ == TFAutoModelForSequenceClassification.__name__:
+            x_train, y_train = zip(*data_iterator)
+            x_train = self.tokenizer(list(x_train), **self.tokenizer_kwargs, return_tensors="tf")
+            y_train = np.array(y_train)
+            history = self.model.fit(dict(x_train), y_train, **self.train_config)
+        elif self.loader.__name__ == TFAutoModelForTokenClassification.__name__:
             x_train, y_train = zip(*data_iterator)
             x_train = self.tokenizer(list(x_train), **self.tokenizer_kwargs, return_tensors="tf")
             max_length = max(len(seq) for seq in x_train['input_ids'])
             y_train_padded = process_labels(y_train, max_length, -100)
             y_train = np.array(y_train_padded)
-
             history = self.model.fit(dict(x_train), y_train, **self.train_config)
         elif self.loader.__name__ == TFAutoModelForCausalLM.__name__:
             x_train = self.tokenizer(list(data_iterator), **self.tokenizer_kwargs, return_tensors="tf")

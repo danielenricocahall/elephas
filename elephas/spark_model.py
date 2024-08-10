@@ -426,13 +426,10 @@ class SparkHFModel(SparkModel):
 
                 model = loader.from_pretrained(model_dir, local_files_only=True)
 
-                predictions = []
-                for batch in partition:
-                    inputs = tokenizer(batch, **tokenizer_kwargs, return_tensors="tf")
-                    outputs = model(**inputs)
-                    predictions.extend(outputs.logits.numpy())
+                inputs = tokenizer(partition, **tokenizer_kwargs, return_tensors="tf")
+                outputs = model(**inputs).logits.numpy()
                 shutil.rmtree(model_dir)
-                return predictions
+                return outputs
 
             def _predict_with_indices(partition):
                 data, indices = zip(*partition)
@@ -442,12 +439,9 @@ class SparkHFModel(SparkModel):
                 shutil.unpack_archive(zip_path, model_dir)
 
                 model = loader.from_pretrained(model_dir, local_files_only=True)
-                predictions = []
-                for batch in data:
-                    inputs = tokenizer(batch, **tokenizer_kwargs, return_tensors="tf")
-                    outputs = model(**inputs)
-                    predictions.extend(outputs.logits.numpy())
-                return zip(predictions, indices)
+                inputs = tokenizer(data, **tokenizer_kwargs, return_tensors="tf")
+                outputs = model(**inputs).logits.numpy()
+                return zip(outputs, indices)
 
             return self._predict_and_collect(rdd, _predict, _predict_with_indices)
 
@@ -492,11 +486,8 @@ class SparkHFModel(SparkModel):
 
                 model = loader.from_pretrained(model_dir, local_files_only=True)
 
-                generations = []
-                for batch in partition:
-                    inputs = tokenizer(batch, **tokenizer_kwargs, return_tensors="tf")
-                    outputs = model.generate(**inputs, **kwargs)
-                    generations.extend(outputs)
+                inputs = tokenizer(partition, **tokenizer_kwargs, return_tensors="tf")
+                generations = model.generate(**inputs, **kwargs)
                 shutil.rmtree(model_dir)
                 return generations
 
@@ -508,11 +499,9 @@ class SparkHFModel(SparkModel):
                 shutil.unpack_archive(zip_path, model_dir)
 
                 model = loader.from_pretrained(model_dir, local_files_only=True)
-                generations = []
-                for batch in data:
-                    inputs = tokenizer(batch, **tokenizer_kwargs, return_tensors="tf")
-                    outputs = model.generate(**inputs, **kwargs)
-                    generations.extend(outputs)
+                inputs = tokenizer(data, **tokenizer_kwargs, return_tensors="tf")
+                generations = model.generate(**inputs, **kwargs)
+                shutil.rmtree(model_dir)
                 return zip(generations, indices)
 
             return self._predict_and_collect(rdd, _generate, _generate_with_indices)
