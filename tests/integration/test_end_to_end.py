@@ -313,8 +313,8 @@ def test_training_huggingface_token_classification(spark_context):
     spark_model.fit(rdd, epochs=epochs, batch_size=batch_size)
 
     # Run inference on trained Spark model
+    predictions = spark_model.predict(spark_context.parallelize(x_test))
     samples = tokenizer(x_test, **tokenizer_kwargs, return_tensors="tf")
-    predictions = spark_model(**samples)
     max_length = max(len(seq) for seq in samples['input_ids'])
     predictions = pad_labels(predictions, max_length, -100)
     # Evaluate results
