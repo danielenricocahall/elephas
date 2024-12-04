@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "elephas"
-version = "6.1.0"
+version = "6.2.0"
 description = "Distributed deep learning on Spark with Keras"
 readme = "README.md"
 homepage = "https://danielenricocahall.github.io/elephas/"
@@ -16,7 +16,6 @@ pyspark = "<=3.5.1"
 Cython = "^0.29.33"
 numpy = "1.23.5"
 transformers = { version = "<=4.42.4", optional = true }
-datasets = "^2.20.0"
 
 
 [tool.poetry.dev-dependencies]
@@ -27,6 +26,7 @@ pytest-spark = "^0.6.0"
 mock = "^5.1.0"
 scikit-learn = "^1.5.1"
 transformers = "^4.42.4"
+datasets = "^2.20.0"
 
 [tool.poetry.extras]
 huggingface = ["transformers"]
