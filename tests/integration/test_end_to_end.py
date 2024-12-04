@@ -30,22 +30,6 @@ from elephas.utils.versioning_utils import get_minor_version
 def _generate_port_number(port=3000, _count=count(1)):
     return port + next(_count)
 
-def pad_until_max_length(base_tensor, padding_tensor, target_row_size):
-    current_rows = tf.shape(base_tensor)[0]
-    rows_to_add = target_row_size - current_rows
-
-    # Check if no padding is needed
-    if rows_to_add <= 0:
-        return base_tensor
-
-    # Repeat the padding tensor as many times as needed
-    repeated_padding = tf.tile(padding_tensor, [rows_to_add, 1])
-
-    # Concatenate the base tensor with the repeated padding
-    padded_tensor = tf.concat([base_tensor, repeated_padding], axis=0)
-
-    return padded_tensor
-
 
 COMBINATIONS = [(Mode.SYNCHRONOUS, None, None),
                 (Mode.SYNCHRONOUS, None, 2),
