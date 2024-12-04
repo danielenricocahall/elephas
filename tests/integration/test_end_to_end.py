@@ -8,6 +8,7 @@ from pyspark.ml.feature import StringIndexer, VectorAssembler
 from sklearn.datasets import fetch_20newsgroups
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
+import tensorflow as tf
 from tensorflow.keras.optimizers.legacy import SGD, Adam
 from tensorflow.keras import Input
 from tensorflow.keras.layers import Embedding, Flatten, Dot
@@ -28,6 +29,22 @@ from elephas.utils.versioning_utils import get_minor_version
 
 def _generate_port_number(port=3000, _count=count(1)):
     return port + next(_count)
+
+def pad_until_max_length(base_tensor, padding_tensor, target_row_size):
+    current_rows = tf.shape(base_tensor)[0]
+    rows_to_add = target_row_size - current_rows
+
+    # Check if no padding is needed
+    if rows_to_add <= 0:
+        return base_tensor
+
+    # Repeat the padding tensor as many times as needed
+    repeated_padding = tf.tile(padding_tensor, [rows_to_add, 1])
+
+    # Concatenate the base tensor with the repeated padding
+    padded_tensor = tf.concat([base_tensor, repeated_padding], axis=0)
+
+    return padded_tensor
 
 
 COMBINATIONS = [(Mode.SYNCHRONOUS, None, None),
@@ -313,9 +330,7 @@ def test_training_huggingface_token_classification(spark_context):
     spark_model.fit(rdd, epochs=epochs, batch_size=batch_size)
 
     # Run inference on trained Spark model
-    predictions = spark_model.predict(spark_context.parallelize(x_test))
     samples = tokenizer(x_test, **tokenizer_kwargs, return_tensors="tf")
-    max_length = max(len(seq) for seq in samples['input_ids'])
-    predictions = pad_labels(predictions, max_length, -100)
+    predictions = spark_model(**samples)
     # Evaluate results
     assert all(np.isclose(x, y, 0.01).all() for x, y in zip(predictions, spark_model.master_network(**samples)[0]))

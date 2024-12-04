@@ -533,6 +533,44 @@ class SparkHFModel(SparkModel):
             # Logic for saving to Hadoop (not implemented)
             raise NotImplementedError("Saving to Hadoop needs to be implemented.")
 
+    def __call__(self, *args, **kwargs) -> List[np.ndarray]:
+        from pyspark.sql import SparkSession
+        sc = SparkSession.builder.getOrCreate().sparkContext
+
+        rdd = sc.parallelize(kwargs.items())
+        loader = self.tf_loader
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Save and prepare the model for distributed inference
+            _zip_path = save_and_zip_model(self._master_network, temp_dir)
+            rdd.context.addFile(_zip_path)
+
+            def _call_partition(partition):
+                zip_path = SparkFiles.get(_zip_path)
+                model_dir = tempfile.mkdtemp()
+
+                shutil.unpack_archive(zip_path, model_dir)
+
+                model = loader.from_pretrained(model_dir, local_files_only=True)
+
+                # Rebuild tokenized input on each partition
+                samples = dict(partition)
+                outputs = model(**samples)
+                if hasattr(outputs, "logits"):
+                    results = outputs.logits.numpy()
+                elif hasattr(outputs, "sequences"):
+                    results = outputs.sequences.numpy()
+                else:
+                    results = outputs.numpy()
+
+                shutil.rmtree(model_dir)
+                return results
+
+            # Perform distributed prediction
+            outputs = rdd.mapPartitions(_call_partition).collect()
+
+        return outputs
+
 
 def load_spark_model(
         file_name: str, from_hadoop: bool = False
