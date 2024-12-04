@@ -331,6 +331,7 @@ def test_training_huggingface_token_classification(spark_context):
 
     # Run inference on trained Spark model
     samples = tokenizer(x_test, **tokenizer_kwargs, return_tensors="tf")
-    predictions = spark_model(**samples)
+    distributed_predictions = spark_model(**samples)
+    regular_predictions = spark_model.master_network(**samples)
     # Evaluate results
-    assert all(np.isclose(x, y, 0.01).all() for x, y in zip(predictions, spark_model.master_network(**samples)[0]))
+    assert all(np.isclose(x, y, 0.01).all() for x, y in zip(distributed_predictions[0], regular_predictions[0]))
