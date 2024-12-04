@@ -8,7 +8,6 @@ from pyspark.ml.feature import StringIndexer, VectorAssembler
 from sklearn.datasets import fetch_20newsgroups
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
-import tensorflow as tf
 from tensorflow.keras.optimizers.legacy import SGD, Adam
 from tensorflow.keras import Input
 from tensorflow.keras.layers import Embedding, Flatten, Dot
@@ -18,13 +17,10 @@ from transformers import AutoTokenizer, TFAutoModelForSequenceClassification, TF
 from elephas.enums.modes import Mode
 from elephas.enums.frequency import Frequency
 from elephas.spark_model import SparkModel, SparkHFModel
-from elephas.utils.huggingface_utils import pad_labels
 from elephas.utils.rdd_utils import to_simple_rdd
 
 import pytest
 import numpy as np
-
-from elephas.utils.versioning_utils import get_minor_version
 
 
 def _generate_port_number(port=3000, _count=count(1)):
