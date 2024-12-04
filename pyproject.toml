@@ -16,6 +16,7 @@ pyspark = "<=3.5.1"
 Cython = "^0.29.33"
 numpy = "1.23.5"
 transformers = { version = "<=4.42.4", optional = true }
+datasets = "^2.20.0"
 
 
 [tool.poetry.dev-dependencies]

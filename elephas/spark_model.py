@@ -264,7 +264,7 @@ class SparkModel:
                 data = np.hsplit(data, len(model.input_shape))
             return zip(model.predict(data), indices)
 
-        return self._predict_and_collect(rdd, partial(_predict, json_model, custom_objs),
+        return self._call_and_collect(rdd, partial(_predict, json_model, custom_objs),
                                          partial(_predict_with_indices, json_model, custom_objs))
 
     def _evaluate(self, rdd: RDD, **kwargs) -> Union[List[float], float]:
@@ -309,7 +309,7 @@ class SparkModel:
         # return loss and list of metrics if there are metrics, otherwise just return the scalar loss
         return [avg_loss, *avg_metrics] if avg_metrics else avg_loss
 
-    def _predict_and_collect(self, rdd: RDD, predict_func: Callable, predict_with_indices_func: Callable) -> List[
+    def _call_and_collect(self, rdd: RDD, predict_func: Callable, predict_with_indices_func: Callable) -> List[
         np.ndarray]:
         if self.num_workers and self.num_workers > 1:
             rdd = rdd.zipWithIndex()
@@ -348,7 +348,8 @@ class SparkMLlibModel(SparkModel):
 class SparkHFModel(SparkModel):
     def __init__(self, model, mode=Mode.ASYNCHRONOUS,
                  frequency=Frequency.EPOCH,
-                 parameter_server_mode='http', num_workers=None, batch_size=32, port=4000, tokenizer=None, tokenizer_kwargs=None, loader=None,
+                 parameter_server_mode='http', num_workers=None, batch_size=32, port=4000, tokenizer=None,
+                 tokenizer_kwargs=None, loader=None,
                  *args,
                  **kwargs):
         """
@@ -449,7 +450,7 @@ class SparkHFModel(SparkModel):
                     predictions.extend(outputs.logits.numpy())
                 return zip(predictions, indices)
 
-            return self._predict_and_collect(rdd, _predict, _predict_with_indices)
+            return self._call_and_collect(rdd, _predict, _predict_with_indices)
 
     def _evaluate(self, rdd: RDD, **kwargs) -> List[np.ndarray]:
         """
@@ -515,7 +516,7 @@ class SparkHFModel(SparkModel):
                     generations.extend(outputs)
                 return zip(generations, indices)
 
-            return self._predict_and_collect(rdd, _generate, _generate_with_indices)
+            return self._call_and_collect(rdd, _generate, _generate_with_indices)
 
     def save(self, file_name: str, overwrite: bool = False, to_hadoop: bool = False):
         """
@@ -532,6 +533,53 @@ class SparkHFModel(SparkModel):
         if to_hadoop:
             # Logic for saving to Hadoop (not implemented)
             raise NotImplementedError("Saving to Hadoop needs to be implemented.")
+
+    def __call__(self, *args, **kwargs):
+        from pyspark.sql import SparkSession
+        import numpy as np
+        sc = SparkSession.builder.getOrCreate().sparkContext
+
+        inputs_list = [{key: kwargs[key][i] for key in kwargs} for i in
+                       range(len(next(iter(kwargs.values()))))]
+        rdd = sc.parallelize(inputs_list)
+
+        loader = self.tf_loader
+        with tempfile.TemporaryDirectory() as temp_dir:
+            _zip_path = save_and_zip_model(self._master_network, temp_dir)
+            rdd.context.addFile(_zip_path)
+
+            def _call(partition):
+                zip_path = SparkFiles.get(_zip_path)
+                model_dir = tempfile.mkdtemp()
+                shutil.unpack_archive(zip_path, model_dir)
+                model = loader.from_pretrained(model_dir, local_files_only=True)
+                partition_results = __call(partition, model)
+                shutil.rmtree(model_dir)
+                return partition_results
+
+            def _call_with_indices(partition):
+                zip_path = SparkFiles.get(_zip_path)
+                model_dir = tempfile.mkdtemp()
+                shutil.unpack_archive(zip_path, model_dir)
+                model = loader.from_pretrained(model_dir, local_files_only=True)
+                data, indices = zip(*partition)
+                partition_results = __call(data, model)
+                return zip(partition_results, indices)
+
+        def __call(partition, model):
+            results = []
+            for sample in partition:
+                sample_dict = {key: np.array([value]) for key, value in sample.items()}
+                outputs = model(**sample_dict)
+                if hasattr(outputs, "logits"):
+                    results.append(outputs.logits.numpy())
+                elif hasattr(outputs, "sequences"):
+                    results.append(outputs.sequences.numpy())
+                else:
+                    results.append(outputs.numpy())
+            return results
+
+        return self._call_and_collect(rdd, _call, _call_with_indices),
 
 
 def load_spark_model(

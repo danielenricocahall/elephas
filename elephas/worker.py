@@ -6,10 +6,12 @@ from pyspark import SparkFiles
 from tensorflow.keras.models import model_from_json
 from tensorflow.keras.optimizers import get as get_optimizer
 from tensorflow.python.keras.utils.generic_utils import slice_arrays
+from transformers import TFAutoModelForTokenClassification
 
 from .enums.frequency import Frequency
 from .utils import subtract_params
 from .parameter import BaseParameterClient
+from .utils.huggingface_utils import pad_labels
 
 from .utils.versioning_utils import get_minor_version
 from .utils.model_utils import is_multiple_input_model, is_multiple_output_model
@@ -185,10 +187,16 @@ class SparkHFWorker(SparkWorker):
                            loss=self.master_loss, metrics=self.master_metrics)
         weights_before_training = self.model.get_weights()
         if self.loader.__name__ == TFAutoModelForSequenceClassification.__name__:
-            # TODO: would be nice to have a better way to check if the model is a sequence classification model
             x_train, y_train = zip(*data_iterator)
             x_train = self.tokenizer(list(x_train), **self.tokenizer_kwargs, return_tensors="tf")
             y_train = np.array(y_train)
+            history = self.model.fit(dict(x_train), y_train, **self.train_config)
+        elif self.loader.__name__ == TFAutoModelForTokenClassification.__name__:
+            x_train, y_train = zip(*data_iterator)
+            x_train = self.tokenizer(list(x_train), **self.tokenizer_kwargs, return_tensors="tf")
+            max_length = max(len(seq) for seq in x_train['input_ids'])
+            y_train_padded = pad_labels(y_train, max_length, -100)
+            y_train = np.array(y_train_padded)
             history = self.model.fit(dict(x_train), y_train, **self.train_config)
         elif self.loader.__name__ == TFAutoModelForCausalLM.__name__:
             x_train = self.tokenizer(list(data_iterator), **self.tokenizer_kwargs, return_tensors="tf")
