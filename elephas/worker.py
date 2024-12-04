@@ -6,7 +6,6 @@ from pyspark import SparkFiles
 from tensorflow.keras.models import model_from_json
 from tensorflow.keras.optimizers import get as get_optimizer
 from tensorflow.python.keras.utils.generic_utils import slice_arrays
-from transformers import TFAutoModelForTokenClassification
 
 from .enums.frequency import Frequency
 from .utils import subtract_params
@@ -177,7 +176,7 @@ class SparkHFWorker(SparkWorker):
     def train(self, data_iterator):
         """Train a Huggingface model on a worker
         """
-        from transformers import TFAutoModelForSequenceClassification, TFAutoModelForCausalLM
+        from transformers import TFAutoModelForSequenceClassification, TFAutoModelForCausalLM, TFAutoModelForTokenClassification
 
         temp_dir = self.temp_dir.value
         config = SparkFiles.get(temp_dir)
