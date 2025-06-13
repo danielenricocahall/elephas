@@ -1,4 +1,5 @@
 import os
+import random
 from itertools import count
 from math import isclose
 
@@ -23,8 +24,8 @@ import pytest
 import numpy as np
 
 
-def _generate_port_number(port=3000, _count=count(1)):
-    return port + next(_count)
+def _generate_port_number():
+    return random.randint(30000, 40000)
 
 
 COMBINATIONS = [(Mode.SYNCHRONOUS, None, None),
