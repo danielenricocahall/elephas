@@ -173,12 +173,13 @@ class SparkModel:
         loss = self.master_loss
         metrics = self.master_metrics
         custom = self.custom_objects
+        serialized_optimizer = serialize_optimizer(self.master_optimizer)
 
         model_json = self._master_network.to_json()
         init = self._master_network.get_weights()
         parameters = rdd.context.broadcast(init)
         worker = SparkWorker(model_json, parameters, train_config,
-                             optimizer, loss, metrics, custom)
+                             serialized_optimizer, loss, metrics, custom)
         training_outcomes = rdd.mapPartitions(worker.train).collect()
         new_parameters = self._master_network.get_weights()
         number_of_sub_models = len(training_outcomes)
@@ -296,13 +297,13 @@ class AsynchronousSparkModel(SparkModel):
 
     def _fit(self, rdd: RDD, **kwargs):
         """Protected train method to make wrapping of modes easier"""
-        self._master_network.compile(optimizer=get_optimizer(self.master_optimizer),
+        self._master_network.compile(optimizer=self.master_optimizer,
                                      loss=self.master_loss,
                                      metrics=self.master_metrics)
         self.start_server()
         train_config = kwargs
         freq = self.frequency
-        optimizer = deserialize_optimizer(self.master_optimizer)
+        serialized_optimizer = serialize_optimizer(self.master_optimizer)
         loss = self.master_loss
         metrics = self.master_metrics
         custom = self.custom_objects
@@ -313,7 +314,7 @@ class AsynchronousSparkModel(SparkModel):
 
         print('>>> Initialize workers')
         worker = AsynchronousSparkWorker(
-            model_json, parameters, self.client, train_config, freq, optimizer, loss, metrics, custom)
+            model_json, parameters, self.client, train_config, freq, serialized_optimizer, loss, metrics, custom)
         print('>>> Distribute load')
         rdd.mapPartitions(worker.train).collect()
         print('>>> Async training complete.')
