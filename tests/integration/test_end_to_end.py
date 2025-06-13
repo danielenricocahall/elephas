@@ -129,7 +129,7 @@ def test_training_regression_no_metrics(spark_context, boston_housing_dataset, r
     # Define basic parameters
     batch_size = 64
     epochs = 1
-    sgd = SGD(lr=0.0000001)
+    sgd = Adam()
     regression_model.compile(sgd, 'mse')
     spark_model = SparkModel(regression_model, frequency='epoch', mode=Mode.SYNCHRONOUS, port=_generate_port_number())
 
