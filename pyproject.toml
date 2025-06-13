@@ -14,7 +14,7 @@ Flask = "^2.3.3"
 h5py = "3.11.0"
 pyspark = "<=4.0.0"
 Cython = "^0.29.33"
-numpy = "1.23.5"
+numpy = "<2.0.0"
 
 
 [tool.poetry.dev-dependencies]
