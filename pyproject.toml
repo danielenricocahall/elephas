@@ -14,7 +14,7 @@ dependencies = [
     "h5py==3.11.0",
     "pyspark<=4.0.0",
     "Cython==0.29.33",
-    "numpy<2.0.0"
+    "numpy<2.0.0",
 ]
 
 
@@ -42,7 +42,8 @@ dev-dependencies = [
     "pytest-spark>=0.8.0",
     "mock>=5.1.0",
     "scikit-learn>=1.6.1",
-    "datasets>=2.20.0"
+    "datasets>=2.20.0",
+    "pre-commit>=4.2.0",
 ]
 
 [build-system]
