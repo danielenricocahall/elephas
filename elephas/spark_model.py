@@ -57,7 +57,6 @@ class SparkModel:
                 "Compile your Keras model before initializing an Elephas model with it")
         metrics = model.compiled_metrics._metrics
         loss = model.loss
-        optimizer = serialize_optimizer(model.optimizer)
 
         if custom_objects is None:
             custom_objects = {}
@@ -68,7 +67,7 @@ class SparkModel:
         self.num_workers = num_workers
         self.weights = self._master_network.get_weights()
         self.pickled_weights = None
-        self.master_optimizer = optimizer
+        self.master_optimizer = model.optimizer
         self.master_loss = loss
         self.master_metrics = metrics
         self.custom_objects = custom_objects
@@ -203,7 +202,6 @@ class SparkModel:
             self.start_server()
         train_config = kwargs
         freq = self.frequency
-        optimizer = deserialize_optimizer(self.master_optimizer)
         loss = self.master_loss
         metrics = self.master_metrics
         custom = self.custom_objects
@@ -211,18 +209,18 @@ class SparkModel:
         model_json = self._master_network.to_json()
         init = self._master_network.get_weights()
         parameters = rdd.context.broadcast(init)
-
+        serialized_optimizer = serialize_optimizer(self.master_optimizer)
         if self.mode in [Mode.ASYNCHRONOUS, Mode.HOGWILD]:
             print('>>> Initialize workers')
             worker = AsynchronousSparkWorker(
-                model_json, parameters, self.client, train_config, freq, optimizer, loss, metrics, custom)
+                model_json, parameters, self.client, train_config, freq, serialized_optimizer, loss, metrics, custom)
             print('>>> Distribute load')
             rdd.mapPartitions(worker.train).collect()
             print('>>> Async training complete.')
             new_parameters = self.client.get_parameters()
         elif self.mode == Mode.SYNCHRONOUS:
             worker = SparkWorker(model_json, parameters, train_config,
-                                 optimizer, loss, metrics, custom)
+                                 serialized_optimizer, loss, metrics, custom)
             training_outcomes = rdd.mapPartitions(worker.train).collect()
             new_parameters = self._master_network.get_weights()
             number_of_sub_models = len(training_outcomes)
@@ -270,7 +268,7 @@ class SparkModel:
     def _evaluate(self, rdd: RDD, **kwargs) -> Union[List[float], float]:
         """Private distributed evaluate method called by public evaluate method, after data has been verified to be an RDD"""
         json_model = self.master_network.to_json()
-        optimizer = deserialize_optimizer(self.master_optimizer)
+        optimizer = self.master_optimizer
         loss = self.master_loss
         weights = self.master_network.get_weights()
         weights = rdd.context.broadcast(weights)
