@@ -95,7 +95,7 @@ def test_training_regression(spark_context, mode, parameter_server_mode, num_wor
     # Define basic parameters
     batch_size = 32
     epochs = 10
-    sgd = SGD(lr=0.001, momentum=0.9)
+    sgd = Adam()
     regression_model.compile(sgd, 'mse', ['mae', 'mean_absolute_percentage_error'])
     spark_model = SparkModel(regression_model, frequency='epoch', mode=mode, num_workers=num_workers,
                              parameter_server_mode=parameter_server_mode, port=_generate_port_number())
