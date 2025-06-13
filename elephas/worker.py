@@ -1,10 +1,9 @@
 import numpy as np
-import tensorflow as tf
 from itertools import tee
 
 from pyspark import SparkFiles
 from tensorflow.keras.models import model_from_json
-from tensorflow.keras.optimizers import get as get_optimizer
+from tensorflow.keras.optimizers import deserialize as deserialize_optimizer
 from tensorflow.python.keras.utils.generic_utils import slice_arrays
 
 from .enums.frequency import Frequency
@@ -12,7 +11,6 @@ from .utils import subtract_params
 from .parameter import BaseParameterClient
 from .utils.huggingface_utils import pad_labels
 
-from .utils.versioning_utils import get_minor_version
 from .utils.model_utils import is_multiple_input_model, is_multiple_output_model
 
 
@@ -25,32 +23,17 @@ class SparkWorker(object):
         self.json = json
         self.parameters = parameters
         self.train_config = train_config
-        self.master_optimizer = master_optimizer
         self.master_loss = master_loss
+        self.master_optimizer = master_optimizer
         self.master_metrics = master_metrics
         self.custom_objects = custom_objects
         self.model = None
-
-    @property
-    def master_optimizer(self):
-        return self._master_optimizer
-
-    @master_optimizer.setter
-    def master_optimizer(self, optimizer):
-        from tensorflow.keras.optimizers.legacy import Optimizer as LegacyOptimizer
-        if get_minor_version(tf.__version__) >= 13:
-            if not isinstance(optimizer, LegacyOptimizer):
-                raise ValueError(f"In Tensorflow 2.13+, optimizer {optimizer} needs to be a legacy optimizer - "
-                                 f"subclass of "
-                                 f"tensorflow.keras.optimizers.legacy.Optimizer. Currently, non-legacy optimizers ("
-                                 f"subclasses of tensorflow.keras.optimizers) are not supported.")
-        self._master_optimizer = optimizer
 
     def train(self, data_iterator):
         """Train a keras model on a worker
         """
         history = None
-        optimizer = get_optimizer(self.master_optimizer)
+        optimizer = deserialize_optimizer(self.master_optimizer)
         self.model = model_from_json(self.json, self.custom_objects)
         self.model.compile(optimizer=optimizer,
                            loss=self.master_loss, metrics=self.master_metrics)
@@ -75,7 +58,7 @@ class SparkWorker(object):
             yield [deltas, None]
 
 
-class AsynchronousSparkWorker(object):
+class AsynchronousSparkWorker:
     """Asynchronous Spark worker. This code will be executed on workers.
     """
 
@@ -116,7 +99,8 @@ class AsynchronousSparkWorker(object):
             x_train = np.hsplit(x_train, len(self.model.input_shape))
         if is_multiple_output_model(self.model):
             y_train = np.hsplit(y_train, len(self.model.output_shape))
-        self.model.compile(optimizer=get_optimizer(self.master_optimizer),
+        optimizer = deserialize_optimizer(self.master_optimizer)
+        self.model.compile(optimizer=optimizer,
                            loss=self.master_loss, metrics=self.master_metrics)
         self.model.set_weights(self.parameters.value)
 
@@ -182,7 +166,8 @@ class SparkHFWorker(SparkWorker):
         config = SparkFiles.get(temp_dir)
 
         self.model = self.loader.from_pretrained(config, local_files_only=True)
-        self.model.compile(optimizer=get_optimizer(self.master_optimizer),
+        optimizer = deserialize_optimizer(self.master_optimizer)
+        self.model.compile(optimizer=optimizer,
                            loss=self.master_loss, metrics=self.master_metrics)
         weights_before_training = self.model.get_weights()
         if self.loader.__name__ == TFAutoModelForSequenceClassification.__name__:

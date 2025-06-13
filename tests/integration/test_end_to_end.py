@@ -8,7 +8,7 @@ from pyspark.ml.feature import StringIndexer, VectorAssembler
 from sklearn.datasets import fetch_20newsgroups
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
-from tensorflow.keras.optimizers.legacy import SGD, Adam
+from tensorflow.keras.optimizers import SGD, Adam
 from tensorflow.keras import Input
 from tensorflow.keras.layers import Embedding, Flatten, Dot
 from transformers import AutoTokenizer, TFAutoModelForSequenceClassification, TFAutoModelForCausalLM, \
@@ -53,7 +53,7 @@ def test_training_classification(spark_context, mode, parameter_server_mode, num
     x_train = x_train[:1000]
     y_train = y_train[:1000]
 
-    sgd = SGD(lr=0.1)
+    sgd = SGD(learning_rate=0.1)
     classification_model.compile(sgd, 'categorical_crossentropy', ['acc'])
 
     # Build RDD from numpy features and labels
@@ -93,9 +93,9 @@ def test_training_regression(spark_context, mode, parameter_server_mode, num_wor
     rdd = to_simple_rdd(spark_context, x_train, y_train)
 
     # Define basic parameters
-    batch_size = 64
+    batch_size = 32
     epochs = 10
-    sgd = SGD(lr=0.0000001)
+    sgd = Adam()
     regression_model.compile(sgd, 'mse', ['mae', 'mean_absolute_percentage_error'])
     spark_model = SparkModel(regression_model, frequency='epoch', mode=mode, num_workers=num_workers,
                              parameter_server_mode=parameter_server_mode, port=_generate_port_number())
@@ -129,7 +129,7 @@ def test_training_regression_no_metrics(spark_context, boston_housing_dataset, r
     # Define basic parameters
     batch_size = 64
     epochs = 1
-    sgd = SGD(lr=0.0000001)
+    sgd = Adam()
     regression_model.compile(sgd, 'mse')
     spark_model = SparkModel(regression_model, frequency='epoch', mode=Mode.SYNCHRONOUS, port=_generate_port_number())
 

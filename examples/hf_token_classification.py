@@ -1,7 +1,7 @@
 from datasets import load_dataset
 from pyspark.sql import SparkSession
 from sklearn.model_selection import train_test_split
-from tensorflow.keras.optimizers.legacy import Adam
+from tensorflow.keras.optimizers import Adam
 
 from transformers import TFAutoModelForTokenClassification, AutoTokenizer
 
