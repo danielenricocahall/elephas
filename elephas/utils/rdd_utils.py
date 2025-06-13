@@ -51,7 +51,7 @@ def from_labeled_point(rdd: RDD[LabeledPoint], categorical: bool = False, nb_cla
     if categorical:
         if not nb_classes:
             nb_classes = np.max(labels) + 1
-        labels = np.stack(map(lambda x: encode_label(x, nb_classes), labels))
+        labels = np.stack(list(map(lambda x: encode_label(x, nb_classes), labels)))
     return features, labels
 
 
