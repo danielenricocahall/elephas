@@ -24,7 +24,7 @@ You can open an issue using the appropriate template directly from our [Issues P
 ## Local Environment Setup
 If you want to make a change yourself based on an Issue, it should be fairly simple after [forking the repository](https://github.com/danielenricocahall/elephas/fork) and cloning your fork. 
 
-This project currently uses `uv` for convenience, although we currently only have dev dependencies. To create your environment:
+This project currently uses `uv` for convenience. To create your environment:
 ```shell
 uv sync
 ```
@@ -36,7 +36,7 @@ uv run pre-commit install
 ```
 
 ## Unit Testing
-`pytest` is used for all unit testing. To run the unit tests locally (assuming a local environment is set up):
+`pytest` is used for all testing. To run the tests locally (assuming a local environment is set up):
 ```shell
 uv run pytest
 ```
