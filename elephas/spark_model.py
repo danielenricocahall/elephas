@@ -385,6 +385,7 @@ class SparkHFModel(SparkModel):
         metrics = self.master_metrics
         custom = self.custom_objects
         train_config = kwargs
+        serialized_optimizer = serialize_optimizer(optimizer)
 
         with tempfile.TemporaryDirectory() as temp_dir:
             self._master_network.save_pretrained(temp_dir)
@@ -392,7 +393,7 @@ class SparkHFModel(SparkModel):
             temp_dir = rdd.context.broadcast(temp_dir)
 
             worker = SparkHFWorker(None, None, train_config,
-                                   optimizer, loss, metrics, custom, temp_dir=temp_dir, tokenizer=self.tokenizer,
+                                   serialized_optimizer, loss, metrics, custom, temp_dir=temp_dir, tokenizer=self.tokenizer,
                                    tokenizer_kwargs=self.tokenizer_kwargs,
                                    loader=self.tf_loader)
             training_outcomes = rdd.mapPartitions(worker.train).collect()
