@@ -25,7 +25,7 @@ import numpy as np
 
 
 def _generate_port_number():
-    return random.randint(30000, 40000)
+    return random.randint(49152, 65535)
 
 
 COMBINATIONS = [(Mode.SYNCHRONOUS, None, None),
