@@ -53,7 +53,7 @@ def test_training_classification(spark_context, mode, parameter_server_mode, num
     x_train = x_train[:1000]
     y_train = y_train[:1000]
 
-    sgd = SGD(lr=0.1)
+    sgd = SGD(learning_rate=0.1)
     classification_model.compile(sgd, 'categorical_crossentropy', ['acc'])
 
     # Build RDD from numpy features and labels
