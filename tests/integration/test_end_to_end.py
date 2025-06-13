@@ -60,9 +60,11 @@ def test_training_classification(spark_context, mode, parameter_server_mode, num
     rdd = to_simple_rdd(spark_context, x_train, y_train)
 
     # Initialize SparkModel from keras model and Spark context
-    spark_model = SparkModel(classification_model, frequency='epoch', num_workers=num_workers,
-                             mode=mode, parameter_server_mode=parameter_server_mode, port=_generate_port_number())
-
+    if mode == Mode.SYNCHRONOUS:
+        spark_model = SparkModel(classification_model, num_workers=num_workers)
+    else:
+        spark_model = ASparkModel(classification_model, frequency='epoch', num_workers=num_workers,
+                                  mode=mode, parameter_server_mode=parameter_server_mode, port=_generate_port_number())
     # Train Spark model
     spark_model.fit(rdd, epochs=epochs, batch_size=batch_size,
                     verbose=0, validation_split=0.1)
@@ -97,8 +99,12 @@ def test_training_regression(spark_context, mode, parameter_server_mode, num_wor
     epochs = 10
     sgd = SGD(lr=0.0000001)
     regression_model.compile(sgd, 'mse', ['mae', 'mean_absolute_percentage_error'])
-    spark_model = SparkModel(regression_model, frequency='epoch', mode=mode, num_workers=num_workers,
-                             parameter_server_mode=parameter_server_mode, port=_generate_port_number())
+
+    if mode == Mode.SYNCHRONOUS:
+        spark_model = SparkModel(regression_model, num_workers=num_workers)
+    else:
+        spark_model = ASparkModel(regression_model, frequency='epoch', num_workers=num_workers,
+                                  mode=mode, parameter_server_mode=parameter_server_mode, port=_generate_port_number())
 
     # Train Spark model
     spark_model.fit(rdd, epochs=epochs, batch_size=batch_size,
