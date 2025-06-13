@@ -19,7 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
+        uses: astral-sh/setup-uv@v5
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install Spark dependencies
@@ -31,11 +31,8 @@ jobs:
           export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
           export SPARK_LOCAL_IP=0.0.0.0
       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install poetry
-          poetry config virtualenvs.create false
-          poetry install
+        run: uv sync --dev
       - name: Test with pytest
         run: |
-          pytest tests
+          export PYTHONPATH=$PYTHONPATH:$(pwd)
+          uv run pytest tests
