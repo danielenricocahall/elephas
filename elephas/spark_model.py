@@ -278,7 +278,7 @@ class SparkModel:
         return predictions
 
 
-class ASparkModel(SparkModel):
+class AsynchronousSparkModel(SparkModel):
 
     def __init__(self, model, mode=Mode.ASYNCHRONOUS, frequency='epoch', parameter_server_mode='http', num_workers=None,
                  custom_objects=None, batch_size=32, port=4000, *args, **kwargs):
