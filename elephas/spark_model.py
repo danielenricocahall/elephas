@@ -360,10 +360,12 @@ class SparkMLlibModel(SparkModel):
 
 
 class SparkHFModel(SparkModel):
-    def __init__(self, model, mode=Mode.ASYNCHRONOUS,
-                 frequency=Frequency.EPOCH,
-                 parameter_server_mode='http', num_workers=None, batch_size=32, port=4000, tokenizer=None,
-                 tokenizer_kwargs=None, loader=None,
+    def __init__(self, model,
+                 num_workers=None,
+                 batch_size=32,
+                 tokenizer=None,
+                 tokenizer_kwargs=None,
+                 loader=None,
                  *args,
                  **kwargs):
         """
@@ -380,11 +382,7 @@ class SparkHFModel(SparkModel):
         :param batch_size: batch size used for training and inference
         :param port: port used in case of 'http' parameter server mode
         """
-        if mode in [Mode.ASYNCHRONOUS, Mode.HOGWILD]:
-            raise ValueError(f"Asynchronous and Hogwild modes are not supported for Hugging Face models yet - please "
-                             f"use {Mode.SYNCHRONOUS} mode.")
-        super().__init__(model, mode=mode, frequency=frequency, parameter_server_mode=parameter_server_mode,
-                         num_workers=num_workers, batch_size=batch_size, port=port, *args, **kwargs)
+        super().__init__(model, num_workers=num_workers, batch_size=batch_size,*args, **kwargs)
         if isinstance(tokenizer, str):
             from transformers import AutoTokenizer
             self.tokenizer = AutoTokenizer.from_pretrained(tokenizer)
