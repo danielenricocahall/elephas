@@ -1,7 +1,7 @@
 from tensorflow.keras.datasets import mnist
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Dropout, Activation
-from tensorflow.keras.optimizers.legacy import RMSprop
+from tensorflow.keras.optimizers import RMSprop
 from tensorflow.keras.utils import to_categorical
 
 from elephas.spark_model import SparkMLlibModel

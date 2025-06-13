@@ -8,7 +8,7 @@ from pyspark.sql import Column
 from pyspark.sql.types import DoubleType
 import pyspark.sql.functions as F
 from tensorflow.keras import optimizers
-from tensorflow.keras.optimizers.legacy import SGD
+from tensorflow.keras.optimizers import SGD
 from tensorflow.keras.activations import relu
 from tensorflow.keras.layers import Dense
 from tensorflow.keras.models import Sequential
