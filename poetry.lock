@@ -1950,18 +1950,19 @@ pytest = ">=2.2"
 
 [[package]]
 name = "pytest-cov"
-version = "5.0.0"
+version = "6.2.1"
 description = "Pytest plugin for measuring coverage."
 optional = false
-python-versions = ">=3.8"
+python-versions = ">=3.9"
 files = [
-    {file = "pytest-cov-5.0.0.tar.gz", hash = "sha256:5837b58e9f6ebd335b0f8060eecce69b662415b16dc503883a02f45dfeb14857"},
-    {file = "pytest_cov-5.0.0-py3-none-any.whl", hash = "sha256:4f0764a1219df53214206bf1feea4633c3b558a2925c8b59f144f682861ce652"},
+    {file = "pytest_cov-6.2.1-py3-none-any.whl", hash = "sha256:f5bc4c23f42f1cdd23c70b1dab1bbaef4fc505ba950d53e0081d0730dd7e86d5"},
+    {file = "pytest_cov-6.2.1.tar.gz", hash = "sha256:25cc6cc0a5358204b8108ecedc51a9b57b34cc6b8c967cc2c01a4e00d8a67da2"},
 ]
 
 [package.dependencies]
-coverage = {version = ">=5.2.1", extras = ["toml"]}
-pytest = ">=4.6"
+coverage = {version = ">=7.5", extras = ["toml"]}
+pluggy = ">=1.2"
+pytest = ">=6.2.5"
 
 [package.extras]
 testing = ["fields", "hunter", "process-tests", "pytest-xdist", "virtualenv"]
@@ -1983,13 +1984,13 @@ pytest-cache = "*"
 
 [[package]]
 name = "pytest-spark"
-version = "0.6.0"
+version = "0.8.0"
 description = "pytest plugin to run the tests with support of pyspark."
 optional = false
 python-versions = "*"
 files = [
-    {file = "pytest-spark-0.6.0.tar.gz", hash = "sha256:06e3fbfa2e7fa69d2976c10037c9ee3549c80580228bde5b9aa602f44b711f17"},
-    {file = "pytest_spark-0.6.0-py3-none-any.whl", hash = "sha256:cabfbcfca6a4876c5e03b151ba9217f3888fe5142154c1e885dd7902afa85a89"},
+    {file = "pytest_spark-0.8.0-py3-none-any.whl", hash = "sha256:1c7e4e1f6dfdb842f5f651605c1ac80c6cccfff458b22ce3319fcdc26ed8e940"},
+    {file = "pytest_spark-0.8.0.tar.gz", hash = "sha256:26f57d10862fa7cd34567a217e4a3b965d6c4927bd15b196dfde1c6ee5eaf5b1"},
 ]
 
 [package.dependencies]
@@ -3131,4 +3132,4 @@ huggingface = ["transformers"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<3.12"
-content-hash = "7a0bb5c374f74189f1ebdfe8c3cd3cd864e5e24bee957f6809def2e170e83f08"
+content-hash = "f48830806321b2e842ce702aab58212079f6bff66ba712b5b53e95efd71f3df6"
