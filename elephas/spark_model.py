@@ -380,7 +380,7 @@ class SparkHFModel(SparkModel):
         """
         Train a Hugging Face model on an RDD.
         """
-        optimizer = deserialize_optimizer(self.master_optimizer)
+        optimizer = self.master_optimizer
         loss = self.master_loss
         metrics = self.master_metrics
         custom = self.custom_objects
