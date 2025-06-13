@@ -8,7 +8,7 @@ from pyspark.ml.feature import StringIndexer, VectorAssembler
 from sklearn.datasets import fetch_20newsgroups
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
-from tensorflow.keras.optimizers import SGD, Adam
+from tensorflow.keras.optimizers.legacy import SGD, Adam
 from tensorflow.keras import Input
 from tensorflow.keras.layers import Embedding, Flatten, Dot
 from transformers import AutoTokenizer, TFAutoModelForSequenceClassification, TFAutoModelForCausalLM, \
