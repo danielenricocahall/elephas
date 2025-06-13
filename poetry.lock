@@ -3365,5 +3365,5 @@ huggingface = []
 
 [metadata]
 lock-version = "2.0"
-python-versions = ">=3.9,<=3.12"
-content-hash = "6da2e178e66a7885ca780ab2ba0e009cde2ca5b08ebc12ba833ed209caa0516f"
+python-versions = ">=3.9,<3.13"
+content-hash = "16ae7f9c6d92715314635b7d6e325dc4402f150a0d2fe233a3081038f66f2236"
