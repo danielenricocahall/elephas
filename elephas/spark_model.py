@@ -41,13 +41,9 @@ class SparkModel:
         and an averaging frequency.
 
         :param model: Compiled Keras model
-        :param mode: String, choose from `asynchronous`, `synchronous` and `hogwild`
-        :param frequency: String, either `epoch` or `batch`
-        :param parameter_server_mode: String, either `http` or `socket`
         :param num_workers: int, number of workers used for training (defaults to None)
         :param custom_objects: Keras custom objects
         :param batch_size: batch size used for training and inference
-        :param port: port used in case of 'http' parameter server mode
         """
         self._training_histories = []
         self._master_network = model
@@ -375,8 +371,6 @@ class SparkHFModel(SparkModel):
 
         :param model_name_or_path: path to pre-trained model or model identifier from huggingface.co/models
         :param tokenizer_name_or_path: path to pre-trained tokenizer or tokenizer identifier (if different from model)
-        :param mode: String, choose from 'asynchronous', 'synchronous' and 'hogwild'
-        :param frequency: String, either 'epoch' or 'batch'
         :param parameter_server_mode: String, either 'http' or 'socket'
         :param num_workers: int, number of workers used for training
         :param batch_size: batch size used for training and inference
