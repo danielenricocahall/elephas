@@ -17,7 +17,6 @@ import tensorflow as tf
 from pyspark import RDD, SparkFiles
 from tensorflow.keras.models import load_model
 from tensorflow.keras.models import model_from_json
-from tensorflow.keras.optimizers import get as get_optimizer
 from tensorflow.keras.optimizers import serialize as serialize_optimizer, deserialize as deserialize_optimizer
 
 from .enums.frequency import Frequency
@@ -27,7 +26,7 @@ from .parameter.factory import ClientServerFactory
 from .utils import lp_to_simple_rdd, to_simple_rdd
 from .utils import model_to_dict
 from .utils import subtract_params, divide_by
-from .utils.model_utils import is_multiple_input_model, is_multiple_output_model, LossModelTypeMapper, ModelType
+from .utils.model_utils import is_multiple_input_model, is_multiple_output_model
 from .worker import AsynchronousSparkWorker, SparkWorker, SparkHFWorker
 
 
@@ -195,7 +194,7 @@ class SparkModel:
 
     def _fit(self, rdd: RDD, **kwargs):
         """Protected train method to make wrapping of modes easier"""
-        self._master_network.compile(optimizer=get_optimizer(self.master_optimizer),
+        self._master_network.compile(optimizer=self.master_optimizer,
                                      loss=self.master_loss,
                                      metrics=self.master_metrics)
         if self.mode in [Mode.ASYNCHRONOUS, Mode.HOGWILD]:

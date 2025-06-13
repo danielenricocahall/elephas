@@ -1,5 +1,4 @@
 import numpy as np
-import tensorflow as tf
 from itertools import tee
 
 from pyspark import SparkFiles
@@ -59,7 +58,7 @@ class SparkWorker(object):
             yield [deltas, None]
 
 
-class AsynchronousSparkWorker(object):
+class AsynchronousSparkWorker:
     """Asynchronous Spark worker. This code will be executed on workers.
     """
 
@@ -100,7 +99,8 @@ class AsynchronousSparkWorker(object):
             x_train = np.hsplit(x_train, len(self.model.input_shape))
         if is_multiple_output_model(self.model):
             y_train = np.hsplit(y_train, len(self.model.output_shape))
-        self.model.compile(optimizer=get_optimizer(self.master_optimizer),
+        optimizer = deserialize_optimizer(self.master_optimizer)
+        self.model.compile(optimizer=optimizer,
                            loss=self.master_loss, metrics=self.master_metrics)
         self.model.set_weights(self.parameters.value)
 
@@ -166,7 +166,8 @@ class SparkHFWorker(SparkWorker):
         config = SparkFiles.get(temp_dir)
 
         self.model = self.loader.from_pretrained(config, local_files_only=True)
-        self.model.compile(optimizer=get_optimizer(self.master_optimizer),
+        optimizer = deserialize_optimizer(self.master_optimizer)
+        self.model.compile(optimizer=optimizer,
                            loss=self.master_loss, metrics=self.master_metrics)
         weights_before_training = self.model.get_weights()
         if self.loader.__name__ == TFAutoModelForSequenceClassification.__name__:
