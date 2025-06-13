@@ -3,7 +3,7 @@ from pyspark.sql import SparkSession
 from sklearn.datasets import fetch_20newsgroups
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
-from tensorflow.keras.optimizers.legacy import SGD
+from tensorflow.keras.optimizers import SGD
 
 from transformers import TFAutoModelForSequenceClassification, AutoTokenizer
 

@@ -1,5 +1,5 @@
 
-from tensorflow.keras.optimizers.legacy import RMSprop
+from tensorflow.keras.optimizers import RMSprop
 
 from elephas.enums.modes import Mode
 from elephas.spark_model import SparkMLlibModel, load_spark_model

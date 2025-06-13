@@ -17,7 +17,6 @@ import tensorflow as tf
 from pyspark import RDD, SparkFiles
 from tensorflow.keras.models import load_model
 from tensorflow.keras.models import model_from_json
-from tensorflow.keras.optimizers import get as get_optimizer
 from tensorflow.keras.optimizers import serialize as serialize_optimizer, deserialize as deserialize_optimizer
 
 from .enums.frequency import Frequency
@@ -27,7 +26,7 @@ from .parameter.factory import ClientServerFactory
 from .utils import lp_to_simple_rdd, to_simple_rdd
 from .utils import model_to_dict
 from .utils import subtract_params, divide_by
-from .utils.model_utils import is_multiple_input_model, is_multiple_output_model, LossModelTypeMapper, ModelType
+from .utils.model_utils import is_multiple_input_model, is_multiple_output_model
 from .worker import AsynchronousSparkWorker, SparkWorker, SparkHFWorker
 
 
@@ -52,7 +51,6 @@ class SparkModel:
                 "Compile your Keras model before initializing an Elephas model with it")
         metrics = model.compiled_metrics._metrics
         loss = model.loss
-        optimizer = serialize_optimizer(model.optimizer)
 
         if custom_objects is None:
             custom_objects = {}
@@ -61,7 +59,7 @@ class SparkModel:
         self.num_workers = num_workers
         self.weights = self._master_network.get_weights()
         self.pickled_weights = None
-        self.master_optimizer = optimizer
+        self.master_optimizer = model.optimizer
         self.master_loss = loss
         self.master_metrics = metrics
         self.custom_objects = custom_objects
@@ -168,11 +166,10 @@ class SparkModel:
 
     def _fit(self, rdd: RDD, **kwargs):
         """Protected train method to make wrapping of modes easier"""
-        self._master_network.compile(optimizer=get_optimizer(self.master_optimizer),
+        self._master_network.compile(optimizer=self.master_optimizer,
                                      loss=self.master_loss,
                                      metrics=self.master_metrics)
         train_config = kwargs
-        optimizer = deserialize_optimizer(self.master_optimizer)
         loss = self.master_loss
         metrics = self.master_metrics
         custom = self.custom_objects
@@ -180,7 +177,6 @@ class SparkModel:
         model_json = self._master_network.to_json()
         init = self._master_network.get_weights()
         parameters = rdd.context.broadcast(init)
-
         worker = SparkWorker(model_json, parameters, train_config,
                              optimizer, loss, metrics, custom)
         training_outcomes = rdd.mapPartitions(worker.train).collect()
@@ -226,18 +222,18 @@ class SparkModel:
     def _evaluate(self, rdd: RDD, **kwargs) -> Union[List[float], float]:
         """Private distributed evaluate method called by public evaluate method, after data has been verified to be an RDD"""
         json_model = self.master_network.to_json()
-        optimizer = deserialize_optimizer(self.master_optimizer)
+        serialized_optimizer = serialize_optimizer(self.master_optimizer)
         loss = self.master_loss
         weights = self.master_network.get_weights()
         weights = rdd.context.broadcast(weights)
         custom_objects = self.custom_objects
         metrics = self.master_metrics
 
-        def _evaluate(model, optimizer, loss: Callable[[tf.Tensor, tf.Tensor], tf.Tensor],
+        def _evaluate(model, serialized_optimizer, loss: Callable[[tf.Tensor, tf.Tensor], tf.Tensor],
                       custom_objects: Dict[str, Any], metrics: List[str], kwargs: Dict[str, Any], data_iterator) -> \
                 List[Union[float, int]]:
             model = model_from_json(model, custom_objects)
-            model.compile(optimizer, loss, metrics)
+            model.compile(deserialize_optimizer(serialized_optimizer), loss, metrics)
             model.set_weights(weights.value)
             feature_iterator, label_iterator = tee(data_iterator, 2)
             x_test = np.asarray([x for x, y in feature_iterator])
@@ -254,7 +250,7 @@ class SparkModel:
 
         if self.num_workers:
             rdd = rdd.repartition(self.num_workers)
-        results = rdd.mapPartitions(partial(_evaluate, json_model, optimizer, loss, custom_objects, metrics, kwargs))
+        results = rdd.mapPartitions(partial(_evaluate, json_model, serialized_optimizer, loss, custom_objects, metrics, kwargs))
         mapping_function = lambda x: tuple(x[-1] * x[i] for i in range(len(x) - 1)) + (x[-1],)
         reducing_function = lambda x, y: tuple(x[i] + y[i] for i in range(len(x)))
         agg_loss, *agg_metrics, number_of_samples = results. \
@@ -389,11 +385,12 @@ class SparkHFModel(SparkModel):
         """
         Train a Hugging Face model on an RDD.
         """
-        optimizer = deserialize_optimizer(self.master_optimizer)
+        optimizer = self.master_optimizer
         loss = self.master_loss
         metrics = self.master_metrics
         custom = self.custom_objects
         train_config = kwargs
+        serialized_optimizer = serialize_optimizer(optimizer)
 
         with tempfile.TemporaryDirectory() as temp_dir:
             self._master_network.save_pretrained(temp_dir)
@@ -401,7 +398,7 @@ class SparkHFModel(SparkModel):
             temp_dir = rdd.context.broadcast(temp_dir)
 
             worker = SparkHFWorker(None, None, train_config,
-                                   optimizer, loss, metrics, custom, temp_dir=temp_dir, tokenizer=self.tokenizer,
+                                   serialized_optimizer, loss, metrics, custom, temp_dir=temp_dir, tokenizer=self.tokenizer,
                                    tokenizer_kwargs=self.tokenizer_kwargs,
                                    loader=self.tf_loader)
             training_outcomes = rdd.mapPartitions(worker.train).collect()
