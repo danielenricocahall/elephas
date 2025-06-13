@@ -16,7 +16,7 @@ from transformers import AutoTokenizer, TFAutoModelForSequenceClassification, TF
 
 from elephas.enums.modes import Mode
 from elephas.enums.frequency import Frequency
-from elephas.spark_model import SparkModel, SparkHFModel
+from elephas.spark_model import SparkModel, SparkHFModel, ASparkModel
 from elephas.utils.rdd_utils import to_simple_rdd
 
 import pytest
@@ -186,7 +186,7 @@ def test_multiple_input_model(spark_session, frequency):
 
     rdd_final = df_transformed.rdd.map(row_to_tuple)
 
-    spark_model = SparkModel(model, frequency=frequency, mode=Mode.ASYNCHRONOUS, port=_generate_port_number())
+    spark_model = ASparkModel(model, mode=Mode.ASYNCHRONOUS, frequency=frequency, port=_generate_port_number())
     spark_model.fit(rdd_final, epochs=5, batch_size=32, verbose=0, validation_split=0.1)
     rdd_test_data = rdd_final.map(lambda x: x[0])
     rdd_test_targets = rdd_final.map(lambda x: x[1])
