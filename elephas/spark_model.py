@@ -54,13 +54,11 @@ class SparkModel:
         if not hasattr(model, "loss"):
             raise Exception(
                 "Compile your Keras model before initializing an Elephas model with it")
-        metrics = model.compiled_metrics._metrics
+        metrics = model._compile_metrics._user_metrics if model._compile_metrics else []
         loss = model.loss
 
         if custom_objects is None:
             custom_objects = {}
-        if metrics is None:
-            metrics = []
         self.mode = mode
         self.frequency = frequency
         self.num_workers = num_workers
@@ -278,7 +276,7 @@ class SparkModel:
                       custom_objects: Dict[str, Any], metrics: List[str], kwargs: Dict[str, Any], data_iterator) -> \
                 List[Union[float, int]]:
             model = model_from_json(model, custom_objects)
-            model.compile(deserialize_optimizer(serialized_optimizer), loss, metrics)
+            model.compile(deserialize_optimizer(serialized_optimizer), loss, metrics=metrics)
             model.set_weights(weights.value)
             feature_iterator, label_iterator = tee(data_iterator, 2)
             x_test = np.asarray([x for x, y in feature_iterator])
