@@ -4,7 +4,7 @@ from itertools import tee
 
 from pyspark import SparkFiles
 from tensorflow.keras.models import model_from_json
-from tensorflow.keras.optimizers import get as get_optimizer
+from tensorflow.keras.optimizers import deserialize as deserialize_optimizer
 from tensorflow.python.keras.utils.generic_utils import slice_arrays
 
 from .enums.frequency import Frequency
@@ -12,7 +12,6 @@ from .utils import subtract_params
 from .parameter import BaseParameterClient
 from .utils.huggingface_utils import pad_labels
 
-from .utils.versioning_utils import get_minor_version
 from .utils.model_utils import is_multiple_input_model, is_multiple_output_model
 
 
@@ -35,7 +34,7 @@ class SparkWorker(object):
         """Train a keras model on a worker
         """
         history = None
-        optimizer = get_optimizer(self.master_optimizer)
+        optimizer = deserialize_optimizer(self.master_optimizer)
         self.model = model_from_json(self.json, self.custom_objects)
         self.model.compile(optimizer=optimizer,
                            loss=self.master_loss, metrics=self.master_metrics)
