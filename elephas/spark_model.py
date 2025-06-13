@@ -33,8 +33,7 @@ from .worker import AsynchronousSparkWorker, SparkWorker, SparkHFWorker
 
 class SparkModel:
 
-    def __init__(self, model, mode=Mode.ASYNCHRONOUS, frequency='epoch', parameter_server_mode='http', num_workers=None,
-                 custom_objects=None, batch_size=32, port=4000, *args, **kwargs):
+    def __init__(self, model, num_workers=None, custom_objects=None, batch_size=32, *args, **kwargs):
         """SparkModel
 
         Base class for distributed training on RDDs. Spark model takes a Keras
@@ -63,8 +62,6 @@ class SparkModel:
             custom_objects = {}
         if metrics is None:
             metrics = []
-        self.mode = mode
-        self.frequency = frequency
         self.num_workers = num_workers
         self.weights = self._master_network.get_weights()
         self.pickled_weights = None
@@ -72,23 +69,12 @@ class SparkModel:
         self.master_loss = loss
         self.master_metrics = metrics
         self.custom_objects = custom_objects
-        self.parameter_server_mode = parameter_server_mode
         self.batch_size = batch_size
-        self.port = port
         self.kwargs = kwargs
-
         self.serialized_model = model_to_dict(model)
-        if self.mode != Mode.SYNCHRONOUS:
-            factory = ClientServerFactory.get_factory(self.parameter_server_mode)
-            self.parameter_server = factory.create_server(self.serialized_model, self.port, self.mode,
-                                                          custom_objects=self.custom_objects)
-            self.client = factory.create_client(self.port)
 
     def get_config(self):
         base_config = {
-            'parameter_server_mode': self.parameter_server_mode,
-            'mode': self.mode,
-            'frequency': self.frequency,
             'num_workers': self.num_workers,
             'batch_size': self.batch_size}
         config = base_config.copy()
@@ -151,12 +137,6 @@ class SparkModel:
     def master_network(self, network):
         self._master_network = network
 
-    def start_server(self):
-        self.parameter_server.start()
-
-    def stop_server(self):
-        self.parameter_server.stop()
-
     def predict(self, data: Union[RDD, np.array]) -> List[np.ndarray]:
         """Perform distributed inference with the model"""
         if isinstance(data, (np.ndarray,)):
@@ -188,21 +168,14 @@ class SparkModel:
         if self.num_workers:
             rdd = rdd.repartition(self.num_workers)
 
-        if self.mode in [mode for mode in Mode]:
-            self._fit(rdd, **kwargs)
-        else:
-            raise ValueError(
-                "Choose from one of the modes: asynchronous, synchronous or hogwild")
+        self._fit(rdd, **kwargs)
 
     def _fit(self, rdd: RDD, **kwargs):
         """Protected train method to make wrapping of modes easier"""
         self._master_network.compile(optimizer=get_optimizer(self.master_optimizer),
                                      loss=self.master_loss,
                                      metrics=self.master_metrics)
-        if self.mode in [Mode.ASYNCHRONOUS, Mode.HOGWILD]:
-            self.start_server()
         train_config = kwargs
-        freq = self.frequency
         optimizer = deserialize_optimizer(self.master_optimizer)
         loss = self.master_loss
         metrics = self.master_metrics
@@ -212,31 +185,18 @@ class SparkModel:
         init = self._master_network.get_weights()
         parameters = rdd.context.broadcast(init)
 
-        if self.mode in [Mode.ASYNCHRONOUS, Mode.HOGWILD]:
-            print('>>> Initialize workers')
-            worker = AsynchronousSparkWorker(
-                model_json, parameters, self.client, train_config, freq, optimizer, loss, metrics, custom)
-            print('>>> Distribute load')
-            rdd.mapPartitions(worker.train).collect()
-            print('>>> Async training complete.')
-            new_parameters = self.client.get_parameters()
-        elif self.mode == Mode.SYNCHRONOUS:
-            worker = SparkWorker(model_json, parameters, train_config,
-                                 optimizer, loss, metrics, custom)
-            training_outcomes = rdd.mapPartitions(worker.train).collect()
-            new_parameters = self._master_network.get_weights()
-            number_of_sub_models = len(training_outcomes)
-            for training_outcome in training_outcomes:
-                grad, history = training_outcome
-                self.training_histories.append(history)
-                weighted_grad = divide_by(grad, number_of_sub_models)
-                new_parameters = subtract_params(new_parameters, weighted_grad)
-            print('>>> Synchronous training complete.')
-        else:
-            raise ValueError("Unsupported mode {}".format(self.mode))
+        worker = SparkWorker(model_json, parameters, train_config,
+                             optimizer, loss, metrics, custom)
+        training_outcomes = rdd.mapPartitions(worker.train).collect()
+        new_parameters = self._master_network.get_weights()
+        number_of_sub_models = len(training_outcomes)
+        for training_outcome in training_outcomes:
+            grad, history = training_outcome
+            self.training_histories.append(history)
+            weighted_grad = divide_by(grad, number_of_sub_models)
+            new_parameters = subtract_params(new_parameters, weighted_grad)
+        print('>>> Synchronous training complete.')
         self._master_network.set_weights(new_parameters)
-        if self.mode in [Mode.ASYNCHRONOUS, Mode.HOGWILD]:
-            self.stop_server()
 
     def _predict(self, rdd: RDD) -> List[np.ndarray]:
         """
@@ -265,7 +225,7 @@ class SparkModel:
             return zip(model.predict(data), indices)
 
         return self._call_and_collect(rdd, partial(_predict, json_model, custom_objs),
-                                         partial(_predict_with_indices, json_model, custom_objs))
+                                      partial(_predict_with_indices, json_model, custom_objs))
 
     def _evaluate(self, rdd: RDD, **kwargs) -> Union[List[float], float]:
         """Private distributed evaluate method called by public evaluate method, after data has been verified to be an RDD"""
@@ -320,6 +280,60 @@ class SparkModel:
         else:
             predictions = rdd.mapPartitions(partial(predict_func)).collect()
         return predictions
+
+
+class ASparkModel(SparkModel):
+
+    def __init__(self, model, mode=Mode.ASYNCHRONOUS, frequency='epoch', parameter_server_mode='http', num_workers=None,
+                 custom_objects=None, batch_size=32, port=4000, *args, **kwargs):
+        super().__init__(model, batch_size=batch_size, num_workers=num_workers, custom_objects=custom_objects, *args,
+                         **kwargs)
+        self.mode = mode
+        self.parameter_server_mode = parameter_server_mode
+        self.frequency = frequency
+        factory = ClientServerFactory.get_factory(parameter_server_mode)
+        self.parameter_server = factory.create_server(self.serialized_model, port, self.mode,
+                                                      custom_objects=self.custom_objects)
+        self.client = factory.create_client(port)
+
+    def get_config(self):
+        config = super().get_config()
+        return {**config,
+                'parameter_server_mode': self.parameter_server_mode,
+                'mode': self.mode, 'frequency': self.frequency}
+
+    def _fit(self, rdd: RDD, **kwargs):
+        """Protected train method to make wrapping of modes easier"""
+        self._master_network.compile(optimizer=get_optimizer(self.master_optimizer),
+                                     loss=self.master_loss,
+                                     metrics=self.master_metrics)
+        self.start_server()
+        train_config = kwargs
+        freq = self.frequency
+        optimizer = deserialize_optimizer(self.master_optimizer)
+        loss = self.master_loss
+        metrics = self.master_metrics
+        custom = self.custom_objects
+
+        model_json = self._master_network.to_json()
+        init = self._master_network.get_weights()
+        parameters = rdd.context.broadcast(init)
+
+        print('>>> Initialize workers')
+        worker = AsynchronousSparkWorker(
+            model_json, parameters, self.client, train_config, freq, optimizer, loss, metrics, custom)
+        print('>>> Distribute load')
+        rdd.mapPartitions(worker.train).collect()
+        print('>>> Async training complete.')
+        new_parameters = self.client.get_parameters()
+        self._master_network.set_weights(new_parameters)
+        self.stop_server()
+
+    def start_server(self):
+        self.parameter_server.start()
+
+    def stop_server(self):
+        self.parameter_server.stop()
 
 
 class SparkMLlibModel(SparkModel):
