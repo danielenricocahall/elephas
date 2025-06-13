@@ -16,7 +16,7 @@ applications, including:
 - [Distributed inference and evaluation of deep learning models](#distributed-inference-and-evaluation)
 - [~~Distributed training of ensemble models~~](#distributed-training-of-ensemble-models)  (removed as of 3.0.0)
 - [~~Distributed hyper-parameter optimization~~](#distributed-hyper-parameter-optimization)  (removed as of 3.0.0)
-- [Distributed training and inference with Hugging Face models](#hugging-face-models-training-and-inference) (added as 6.0.0)
+- [~~Distributed training and inference with Hugging Face models~~](#hugging-face-models-training-and-inference) (removed as 7.0.0)
 
 
 
@@ -307,6 +307,7 @@ In this example an ensemble of 10 models is built, based on optimization of at m
 
 
 ## Hugging Face Models Training and Inference
+**Note**: Due to incompatibilities with Keras 3.0 which would ultimately limit the Tensorflow version we can upgrade to, and the announcement of HuggingFace no longer supporting Tensorflow, HuggingFace support has been removed from Elephas.
 As of 6.0.0, Elephas now supports distributed training (and inference) with [HuggingFace](https://huggingface.co/) models (using the Tensorflow/Keras backend), currently for text classification, token classification, and causal langugage modeling only, and in the `"synchronous"` training mode. In future releases, we hope to expand this to other types of models and the `"asynchronous"` and `"hogwild"` training modes. This can be accomplished using the `SparkHFModel`:
 
 ```python 
