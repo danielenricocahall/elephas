@@ -1,34 +1,61 @@
-[tool.poetry]
+[project]
 name = "elephas"
 version = "6.2.1"
 description = "Distributed deep learning on Spark with Keras"
 readme = "README.md"
-homepage = "https://danielenricocahall.github.io/elephas/"
-authors = ["Daniel Cahall <danielenricocahall@gmail.com>"]
-license = "MIT"
+authors = [
+    { name = "Daniel Cahall", email = "danielenricocahall@gmail.com" }
+]
+license = { text = "MIT" }
+requires-python = ">=3.9,<3.13"
+dependencies = [
+    "tensorflow>2.2,<2.20",
+    "Flask==2.3.3",
+    "h5py==3.11.0",
+    "pyspark<=4.0.0",
+    "Cython==0.29.33",
+    "numpy<2.0.0",
+]
 
-[tool.poetry.dependencies]
-python = ">=3.9,<3.13"
-tensorflow = ">2.2,<2.20"
-Flask = "^2.3.3"
-h5py = "3.11.0"
-pyspark = "<=4.0.0"
-Cython = "^0.29.33"
-numpy = "<2.0.0"
+
+[project.urls]
+Homepage = "https://danielenricocahall.github.io/elephas/"
 
 
-[tool.poetry.dev-dependencies]
-pytest = "^8.3.1"
-pytest-pep8 = "^1.0.6"
-pytest-cov = "^6.2.1"
-pytest-spark = "^0.8.0"
-mock = "^5.1.0"
-scikit-learn = "^1.6.1"
-datasets = "^2.20.0"
 
-[tool.poetry.extras]
-huggingface = ["transformers"]
+[tool.pytest.ini_options]
+addopts = "--cov"
+
+[tool.coverage.run]
+branch = true
+source = ["elephas"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.3.1",
+    "pytest-pep8>=1.0.6",
+    "pytest-cov>=6.2.1",
+    "pytest-spark>=0.8.0",
+    "mock>=5.1.0",
+    "scikit-learn>=1.6.1",
+    "datasets>=2.20.0",
+    "pre-commit>=4.2.0",
+]
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build]
+exclude = [
+  "/.*",
+  "/tests",
+    "/docs",
+    "/examples",
+    "README.md",
+    "CONTRIBUTING.md"
+]
