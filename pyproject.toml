@@ -10,13 +10,11 @@ license = "MIT"
 [tool.poetry.dependencies]
 python = ">=3.9,<=3.12"
 tensorflow = ">2.2,<2.20"
-keras = "<3.0.0"
 Flask = "^2.3.3"
 h5py = "3.11.0"
 pyspark = "<=4.0.0"
 Cython = "^0.29.33"
 numpy = "1.23.5"
-transformers = { version = "<5.0.0", optional = true }
 
 
 [tool.poetry.dev-dependencies]
@@ -26,7 +24,6 @@ pytest-cov = "^6.2.1"
 pytest-spark = "^0.8.0"
 mock = "^5.1.0"
 scikit-learn = "^1.6.1"
-transformers = "<5.0.0"
 datasets = "^2.20.0"
 
 [tool.poetry.extras]
