@@ -21,7 +21,8 @@ from tensorflow.keras.optimizers import (
     deserialize as deserialize_optimizer,
 )
 
-from .enums.modes import Mode, Frequency
+from .enums.modes import Mode
+from .enums.frequency import Frequency
 from .mllib import to_matrix, from_matrix, to_vector, from_vector
 from .parameter.factory import ClientServerFactory
 from .utils import lp_to_simple_rdd, to_simple_rdd
