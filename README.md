@@ -6,7 +6,7 @@
 
 [![Build Status](https://github.com/danielenricocahall/elephas/actions/workflows/ci.yaml/badge.svg)](https://github.com/danielenricocahall/elephas/actions/workflows/ci.yaml/badge.svg)
 [![license](https://img.shields.io/github/license/mashape/apistatus.svg?maxAge=2592000)](https://github.com/danielenricocahall/elephas/blob/master/LICENSE)
-[![Supported Versions](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11-blue)](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11-blue)
+[![Supported Versions](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11%20%7C%203.12-blue)](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11-blue)
 
 Elephas is an extension of [Keras](http://keras.io), which allows you to run distributed deep learning models at 
 scale with [Spark](http://spark.apache.org). Elephas currently supports a number of 
@@ -16,7 +16,7 @@ applications, including:
 - [Distributed inference and evaluation of deep learning models](#distributed-inference-and-evaluation)
 - [~~Distributed training of ensemble models~~](#distributed-training-of-ensemble-models)  (removed as of 3.0.0)
 - [~~Distributed hyper-parameter optimization~~](#distributed-hyper-parameter-optimization)  (removed as of 3.0.0)
-- [Distributed training and inference with Hugging Face models](#hugging-face-models-training-and-inference) (added as 6.0.0)
+- [~~Distributed training and inference with Hugging Face models~~](#hugging-face-models-training-and-inference) (removed as 7.0.0)
 
 
 
@@ -309,6 +309,7 @@ In this example an ensemble of 10 models is built, based on optimization of at m
 
 
 ## Hugging Face Models Training and Inference
+**Note**: Due to incompatibilities with Keras 3.0 which would ultimately limit the Tensorflow version we can upgrade to, and the announcement of HuggingFace no longer supporting Tensorflow, HuggingFace support has been removed from Elephas.
 As of 6.0.0, Elephas now supports distributed training (and inference) with [HuggingFace](https://huggingface.co/) models (using the Tensorflow/Keras backend), currently for text classification, token classification, and causal langugage modeling only, and in the `"synchronous"` training mode. In future releases, we hope to expand this to other types of models and the `"asynchronous"` and `"hogwild"` training modes. This can be accomplished using the `SparkHFModel`:
 
 ```python 

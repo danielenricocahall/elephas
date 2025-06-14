@@ -79,7 +79,7 @@ class SocketClient(BaseParameterClient):
             host = determine_master(port=self.port).split(':')[0]
             sock.connect((host, self.port))
             sock.sendall(b'g')
-            data = np.asarray(receive(sock))
+            data = np.asarray(receive(sock), dtype=object)
         return data
 
     def update_parameters(self, delta: list):
