@@ -1,7 +1,6 @@
 import numpy as np
 from itertools import tee
 
-from pyspark import SparkFiles
 from tensorflow.keras.models import model_from_json
 from tensorflow.keras.optimizers import deserialize as deserialize_optimizer
 from tensorflow.python.keras.utils.generic_utils import slice_arrays
@@ -9,17 +8,23 @@ from tensorflow.python.keras.utils.generic_utils import slice_arrays
 from .enums.frequency import Frequency
 from .utils import subtract_params
 from .parameter import BaseParameterClient
-from .utils.huggingface_utils import pad_labels
 
 from .utils.model_utils import is_multiple_input_model, is_multiple_output_model
 
 
 class SparkWorker(object):
-    """Synchronous Spark worker. This code will be executed on workers.
-    """
+    """Synchronous Spark worker. This code will be executed on workers."""
 
-    def __init__(self, json, parameters, train_config, master_optimizer,
-                 master_loss, master_metrics, custom_objects):
+    def __init__(
+        self,
+        json,
+        parameters,
+        train_config,
+        master_optimizer,
+        master_loss,
+        master_metrics,
+        custom_objects,
+    ):
         self.json = json
         self.parameters = parameters
         self.train_config = train_config
@@ -30,13 +35,13 @@ class SparkWorker(object):
         self.model = None
 
     def train(self, data_iterator):
-        """Train a keras model on a worker
-        """
+        """Train a keras model on a worker"""
         history = None
         optimizer = deserialize_optimizer(self.master_optimizer)
         self.model = model_from_json(self.json, self.custom_objects)
-        self.model.compile(optimizer=optimizer,
-                           loss=self.master_loss, metrics=self.master_metrics)
+        self.model.compile(
+            optimizer=optimizer, loss=self.master_loss, metrics=self.master_metrics
+        )
         self.model.set_weights(self.parameters.value)
 
         feature_iterator, label_iterator = tee(data_iterator, 2)
@@ -47,11 +52,10 @@ class SparkWorker(object):
         if is_multiple_output_model(self.model):
             y_train = np.hsplit(y_train, len(self.model.output_shape))
         weights_before_training = self.model.get_weights()
-        if x_train.shape[0] > self.train_config.get('batch_size'):
+        if x_train.shape[0] > self.train_config.get("batch_size"):
             history = self.model.fit(x_train, y_train, **self.train_config)
         weights_after_training = self.model.get_weights()
-        deltas = subtract_params(
-            weights_before_training, weights_after_training)
+        deltas = subtract_params(weights_before_training, weights_after_training)
         if history:
             yield [deltas, history.history]
         else:
@@ -59,12 +63,20 @@ class SparkWorker(object):
 
 
 class AsynchronousSparkWorker:
-    """Asynchronous Spark worker. This code will be executed on workers.
-    """
+    """Asynchronous Spark worker. This code will be executed on workers."""
 
-    def __init__(self, json, parameters, client, train_config, frequency,
-                 master_optimizer, master_loss, master_metrics, custom_objects):
-
+    def __init__(
+        self,
+        json,
+        parameters,
+        client,
+        train_config,
+        frequency,
+        master_optimizer,
+        master_loss,
+        master_metrics,
+        custom_objects,
+    ):
         if isinstance(client, BaseParameterClient):
             # either supply a client object directly
             self.client = client
@@ -100,12 +112,13 @@ class AsynchronousSparkWorker:
         if is_multiple_output_model(self.model):
             y_train = np.hsplit(y_train, len(self.model.output_shape))
         optimizer = deserialize_optimizer(self.master_optimizer)
-        self.model.compile(optimizer=optimizer,
-                           loss=self.master_loss, metrics=self.master_metrics)
+        self.model.compile(
+            optimizer=optimizer, loss=self.master_loss, metrics=self.master_metrics
+        )
         self.model.set_weights(self.parameters.value)
 
-        epochs = self.train_config['epochs']
-        batch_size = self.train_config.get('batch_size')
+        epochs = self.train_config["epochs"]
+        batch_size = self.train_config.get("batch_size")
         nb_batch = int(np.ceil(nb_train_sample / float(batch_size)))
         index_array = np.arange(nb_train_sample)
         batches = [
@@ -117,18 +130,19 @@ class AsynchronousSparkWorker:
             for epoch in range(epochs):
                 weights_before_training = self.client.get_parameters()
                 self.model.set_weights(weights_before_training)
-                self.train_config['epochs'] = 1
+                self.train_config["epochs"] = 1
                 if nb_train_sample > batch_size:
                     self.model.fit(x_train, y_train, **self.train_config)
-                self.train_config['epochs'] = epochs
+                self.train_config["epochs"] = epochs
                 weights_after_training = self.model.get_weights()
                 deltas = subtract_params(
-                    weights_before_training, weights_after_training)
+                    weights_before_training, weights_after_training
+                )
                 self.client.update_parameters(deltas)
         elif self.frequency == Frequency.BATCH:
             for epoch in range(epochs):
                 if nb_train_sample > batch_size:
-                    for (batch_start, batch_end) in batches:
+                    for batch_start, batch_end in batches:
                         weights_before_training = self.client.get_parameters()
                         self.model.set_weights(weights_before_training)
                         batch_ids = index_array[batch_start:batch_end]
@@ -137,62 +151,13 @@ class AsynchronousSparkWorker:
                         self.model.train_on_batch(x, y)
                         weights_after_training = self.model.get_weights()
                         deltas = subtract_params(
-                            weights_before_training, weights_after_training)
+                            weights_before_training, weights_after_training
+                        )
                         self.client.update_parameters(deltas)
         else:
             raise ValueError(
-                'frequency parameter can be `epoch` or `batch, got {}'.format(self.frequency))
+                "frequency parameter can be `epoch` or `batch, got {}".format(
+                    self.frequency
+                )
+            )
         yield []
-
-
-class SparkHFWorker(SparkWorker):
-    """Synchronous worker for Huggingface models"""
-
-    def __init__(self, json, parameters, train_config, master_optimizer,
-                 master_loss, master_metrics, custom_objects, temp_dir, tokenizer, tokenizer_kwargs, loader):
-        super().__init__(json, parameters, train_config, master_optimizer,
-                         master_loss, master_metrics, custom_objects)
-        self.tokenizer = tokenizer
-        self.tokenizer_kwargs = tokenizer_kwargs
-        self.temp_dir = temp_dir
-        self.loader = loader
-
-    def train(self, data_iterator):
-        """Train a Huggingface model on a worker
-        """
-        from transformers import TFAutoModelForSequenceClassification, TFAutoModelForCausalLM, TFAutoModelForTokenClassification
-
-        temp_dir = self.temp_dir.value
-        config = SparkFiles.get(temp_dir)
-
-        self.model = self.loader.from_pretrained(config, local_files_only=True)
-        optimizer = deserialize_optimizer(self.master_optimizer)
-        self.model.compile(optimizer=optimizer,
-                           loss=self.master_loss, metrics=self.master_metrics)
-        weights_before_training = self.model.get_weights()
-        if self.loader.__name__ == TFAutoModelForSequenceClassification.__name__:
-            x_train, y_train = zip(*data_iterator)
-            x_train = self.tokenizer(list(x_train), **self.tokenizer_kwargs, return_tensors="tf")
-            y_train = np.array(y_train)
-            history = self.model.fit(dict(x_train), y_train, **self.train_config)
-        elif self.loader.__name__ == TFAutoModelForTokenClassification.__name__:
-            x_train, y_train = zip(*data_iterator)
-            x_train = self.tokenizer(list(x_train), **self.tokenizer_kwargs, return_tensors="tf")
-            max_length = max(len(seq) for seq in x_train['input_ids'])
-            y_train_padded = pad_labels(y_train, max_length, -100)
-            y_train = np.array(y_train_padded)
-            history = self.model.fit(dict(x_train), y_train, **self.train_config)
-        elif self.loader.__name__ == TFAutoModelForCausalLM.__name__:
-            x_train = self.tokenizer(list(data_iterator), **self.tokenizer_kwargs, return_tensors="tf")
-            x_train, y_train = x_train['input_ids'][:, :-1], x_train['input_ids'][:, 1:]
-            history = self.model.fit(x_train, y_train, **self.train_config)
-        else:
-            raise ValueError(f"Unsupported loader type: {self.loader.__name__}")
-
-        weights_after_training = self.model.get_weights()
-        deltas = subtract_params(
-            weights_before_training, weights_after_training)
-        if history:
-            yield [deltas, history.history]
-        else:
-            yield [deltas, None]
