@@ -1,8 +1,7 @@
 import json
-import logging
 import shutil
 import subprocess
-import tempfile
+from contextlib import contextmanager
 from uuid import uuid4
 from pathlib import Path
 from copy import deepcopy
@@ -14,25 +13,34 @@ import h5py
 import numpy as np
 import pyspark
 import tensorflow as tf
-from pyspark import RDD, SparkFiles
+from pyspark import RDD
 from tensorflow.keras.models import load_model
 from tensorflow.keras.models import model_from_json
-from tensorflow.keras.optimizers import serialize as serialize_optimizer, deserialize as deserialize_optimizer
+from tensorflow.keras.optimizers import (
+    serialize as serialize_optimizer,
+    deserialize as deserialize_optimizer,
+)
 
-from .enums.frequency import Frequency
-from .enums.modes import Mode
+from .enums.modes import Mode, Frequency
 from .mllib import to_matrix, from_matrix, to_vector, from_vector
 from .parameter.factory import ClientServerFactory
 from .utils import lp_to_simple_rdd, to_simple_rdd
 from .utils import model_to_dict
 from .utils import subtract_params, divide_by
 from .utils.model_utils import is_multiple_input_model, is_multiple_output_model
-from .worker import AsynchronousSparkWorker, SparkWorker, SparkHFWorker
+from .worker import AsynchronousSparkWorker, SparkWorker
 
 
 class SparkModel:
-
-    def __init__(self, model, num_workers=None, custom_objects=None, batch_size=32, *args, **kwargs):
+    def __init__(
+        self,
+        model,
+        num_workers=None,
+        custom_objects=None,
+        batch_size=32,
+        *args,
+        **kwargs,
+    ):
         """SparkModel
 
         Base class for distributed training on RDDs. Spark model takes a Keras
@@ -48,7 +56,8 @@ class SparkModel:
         self._master_network = model
         if not hasattr(model, "loss"):
             raise Exception(
-                "Compile your Keras model before initializing an Elephas model with it")
+                "Compile your Keras model before initializing an Elephas model with it"
+            )
         metrics = model._compile_metrics._user_metrics if model._compile_metrics else []
         loss = model.loss
 
@@ -66,9 +75,7 @@ class SparkModel:
         self.serialized_model = model_to_dict(model)
 
     def get_config(self):
-        base_config = {
-            'num_workers': self.num_workers,
-            'batch_size': self.batch_size}
+        base_config = {"num_workers": self.num_workers, "batch_size": self.batch_size}
         config = base_config.copy()
         config.update(self.kwargs)
         return config
@@ -85,9 +92,9 @@ class SparkModel:
         :param to_hadoop: Boolean, toggles between saving locally or on a Hadoop
         cluster, default is False
         """
-        assert (
-                file_name[-3:] == ".h5" or file_name[-6:] == ".keras"
-        ), "File name must end with either '.h5' or '.keras'"
+        assert file_name[-3:] == ".h5" or file_name[-6:] == ".keras", (
+            "File name must end with either '.h5' or '.keras'"
+        )
 
         if overwrite and not to_hadoop and Path(file_name).exists():
             Path(file_name).unlink()
@@ -98,12 +105,11 @@ class SparkModel:
 
         model = self._master_network
         model.save(file_name)
-        f = h5py.File(file_name, mode='a')
+        f = h5py.File(file_name, mode="a")
 
-        f.attrs['distributed_config'] = json.dumps({
-            'class_name': self.__class__.__name__,
-            'config': self.get_config()
-        }).encode('utf8')
+        f.attrs["distributed_config"] = json.dumps(
+            {"class_name": self.__class__.__name__, "config": self.get_config()}
+        ).encode("utf8")
 
         f.flush()
         f.close()
@@ -133,13 +139,17 @@ class SparkModel:
         """Perform distributed inference with the model"""
         if isinstance(data, (np.ndarray,)):
             from pyspark.sql import SparkSession
+
             sc = SparkSession.builder.getOrCreate().sparkContext
             data = sc.parallelize(data)
         return self._predict(data)
 
-    def evaluate(self, x_test: np.array, y_test: np.array, **kwargs) -> Union[List[float], float]:
+    def evaluate(
+        self, x_test: np.array, y_test: np.array, **kwargs
+    ) -> Union[List[float], float]:
         """Perform distributed evaluation with the model"""
         from pyspark.sql import SparkSession
+
         sc = SparkSession.builder.getOrCreate().sparkContext
         test_rdd = to_simple_rdd(sc, x_test, y_test)
         return self._evaluate(test_rdd, **kwargs)
@@ -156,7 +166,7 @@ class SparkModel:
         :param verbose: logging verbosity level (0, 1 or 2)
         :param validation_split: percentage of data set aside for validation
         """
-        print('>>> Fit model')
+        print(">>> Fit model")
         if self.num_workers:
             rdd = rdd.repartition(self.num_workers)
 
@@ -164,9 +174,11 @@ class SparkModel:
 
     def _fit(self, rdd: RDD, **kwargs):
         """Protected train method to make wrapping of modes easier"""
-        self._master_network.compile(optimizer=self.master_optimizer,
-                                     loss=self.master_loss,
-                                     metrics=self.master_metrics)
+        self._master_network.compile(
+            optimizer=self.master_optimizer,
+            loss=self.master_loss,
+            metrics=self.master_metrics,
+        )
         train_config = kwargs
         loss = self.master_loss
         metrics = self.master_metrics
@@ -176,8 +188,15 @@ class SparkModel:
         model_json = self._master_network.to_json()
         init = self._master_network.get_weights()
         parameters = rdd.context.broadcast(init)
-        worker = SparkWorker(model_json, parameters, train_config,
-                             serialized_optimizer, loss, metrics, custom)
+        worker = SparkWorker(
+            model_json,
+            parameters,
+            train_config,
+            serialized_optimizer,
+            loss,
+            metrics,
+            custom,
+        )
         training_outcomes = rdd.mapPartitions(worker.train).collect()
         new_parameters = self._master_network.get_weights()
         number_of_sub_models = len(training_outcomes)
@@ -186,7 +205,7 @@ class SparkModel:
             self.training_histories.append(history)
             weighted_grad = divide_by(grad, number_of_sub_models)
             new_parameters = subtract_params(new_parameters, weighted_grad)
-        print('>>> Synchronous training complete.')
+        print(">>> Synchronous training complete.")
         self._master_network.set_weights(new_parameters)
 
     def _predict(self, rdd: RDD) -> List[np.ndarray]:
@@ -198,7 +217,9 @@ class SparkModel:
         weights = rdd.context.broadcast(weights)
         custom_objs = self.custom_objects
 
-        def _predict(model_as_json: str, custom_objects: Dict[str, Any], data) -> np.array:
+        def _predict(
+            model_as_json: str, custom_objects: Dict[str, Any], data
+        ) -> np.array:
             model = model_from_json(model_as_json, custom_objects)
             model.set_weights(weights.value)
             data = np.array([x for x in data])
@@ -206,7 +227,9 @@ class SparkModel:
                 data = np.hsplit(data, len(model.input_shape))
             return model.predict(data)
 
-        def _predict_with_indices(model_as_json: str, custom_objects: Dict[str, Any], data):
+        def _predict_with_indices(
+            model_as_json: str, custom_objects: Dict[str, Any], data
+        ):
             model = model_from_json(model_as_json, custom_objects)
             model.set_weights(weights.value)
             data, indices = zip(*data)
@@ -215,8 +238,11 @@ class SparkModel:
                 data = np.hsplit(data, len(model.input_shape))
             return zip(model.predict(data), indices)
 
-        return self._call_and_collect(rdd, partial(_predict, json_model, custom_objs),
-                                      partial(_predict_with_indices, json_model, custom_objs))
+        return self._call_and_collect(
+            rdd,
+            partial(_predict, json_model, custom_objs),
+            partial(_predict_with_indices, json_model, custom_objs),
+        )
 
     def _evaluate(self, rdd: RDD, **kwargs) -> Union[List[float], float]:
         """Private distributed evaluate method called by public evaluate method, after data has been verified to be an RDD"""
@@ -228,11 +254,19 @@ class SparkModel:
         custom_objects = self.custom_objects
         metrics = self.master_metrics
 
-        def _evaluate(model, serialized_optimizer, loss: Callable[[tf.Tensor, tf.Tensor], tf.Tensor],
-                      custom_objects: Dict[str, Any], metrics: List[str], kwargs: Dict[str, Any], data_iterator) -> \
-                List[Union[float, int]]:
+        def _evaluate(
+            model,
+            serialized_optimizer,
+            loss: Callable[[tf.Tensor, tf.Tensor], tf.Tensor],
+            custom_objects: Dict[str, Any],
+            metrics: List[str],
+            kwargs: Dict[str, Any],
+            data_iterator,
+        ) -> List[Union[float, int]]:
             model = model_from_json(model, custom_objects)
-            model.compile(deserialize_optimizer(serialized_optimizer), loss, metrics=metrics)
+            model.compile(
+                deserialize_optimizer(serialized_optimizer), loss, metrics=metrics
+            )
             model.set_weights(weights.value)
             feature_iterator, label_iterator = tee(data_iterator, 2)
             x_test = np.asarray([x for x, y in feature_iterator])
@@ -242,30 +276,48 @@ class SparkModel:
             if is_multiple_output_model(model):
                 y_test = np.hsplit(y_test, len(model.output_shape))
             evaluation_results = model.evaluate(x_test, y_test, **kwargs)
-            evaluation_results = [evaluation_results] if not isinstance(evaluation_results, list) \
+            evaluation_results = (
+                [evaluation_results]
+                if not isinstance(evaluation_results, list)
                 else evaluation_results
+            )
             # return the evaluation results and the size of the sample
             return [evaluation_results + [len(x_test)]]
 
         if self.num_workers:
             rdd = rdd.repartition(self.num_workers)
-        results = rdd.mapPartitions(partial(_evaluate, json_model, serialized_optimizer, loss, custom_objects, metrics, kwargs))
-        mapping_function = lambda x: tuple(x[-1] * x[i] for i in range(len(x) - 1)) + (x[-1],)
-        reducing_function = lambda x, y: tuple(x[i] + y[i] for i in range(len(x)))
-        agg_loss, *agg_metrics, number_of_samples = results. \
-            map(mapping_function). \
-            reduce(reducing_function)
+        results = rdd.mapPartitions(
+            partial(
+                _evaluate,
+                json_model,
+                serialized_optimizer,
+                loss,
+                custom_objects,
+                metrics,
+                kwargs,
+            )
+        )
+        mapping_function = lambda x: tuple(x[-1] * x[i] for i in range(len(x) - 1)) + (  # noqa: E731
+            x[-1],
+        )
+        reducing_function = lambda x, y: tuple(x[i] + y[i] for i in range(len(x)))  # noqa: E731
+        agg_loss, *agg_metrics, number_of_samples = results.map(
+            mapping_function
+        ).reduce(reducing_function)
         avg_loss = agg_loss / number_of_samples
         avg_metrics = [agg_metric / number_of_samples for agg_metric in agg_metrics]
         # return loss and list of metrics if there are metrics, otherwise just return the scalar loss
         return [avg_loss, *avg_metrics] if avg_metrics else avg_loss
 
-    def _call_and_collect(self, rdd: RDD, predict_func: Callable, predict_with_indices_func: Callable) -> List[
-        np.ndarray]:
+    def _call_and_collect(
+        self, rdd: RDD, predict_func: Callable, predict_with_indices_func: Callable
+    ) -> List[np.ndarray]:
         if self.num_workers and self.num_workers > 1:
             rdd = rdd.zipWithIndex()
             rdd = rdd.repartition(self.num_workers)
-            predictions_and_indices = rdd.mapPartitions(partial(predict_with_indices_func))
+            predictions_and_indices = rdd.mapPartitions(
+                partial(predict_with_indices_func)
+            )
             predictions_sorted_by_index = predictions_and_indices.sortBy(lambda x: x[1])
             predictions = predictions_sorted_by_index.map(lambda x: x[0]).collect()
         else:
@@ -274,84 +326,128 @@ class SparkModel:
 
 
 class AsynchronousSparkModel(SparkModel):
-
-    def __init__(self, model, mode=Mode.ASYNCHRONOUS, frequency='epoch', parameter_server_mode='http', num_workers=None,
-                 custom_objects=None, batch_size=32, port=4000, *args, **kwargs):
-        super().__init__(model, batch_size=batch_size, num_workers=num_workers, custom_objects=custom_objects, *args,
-                         **kwargs)
+    def __init__(
+        self,
+        model,
+        num_workers=None,
+        custom_objects=None,
+        batch_size=32,
+        mode=Mode.ASYNCHRONOUS,
+        frequency=Frequency.EPOCH,
+        parameter_server_mode="http",
+        port=4000,
+        *args,
+        **kwargs,
+    ):
+        super().__init__(
+            model,
+            batch_size=batch_size,
+            num_workers=num_workers,
+            custom_objects=custom_objects,
+            *args,
+            **kwargs,
+        )
         self.mode = mode
         self.parameter_server_mode = parameter_server_mode
         self.frequency = frequency
         factory = ClientServerFactory.get_factory(parameter_server_mode)
-        self.parameter_server = factory.create_server(self.serialized_model, port, self.mode,
-                                                      custom_objects=self.custom_objects)
+        self.parameter_server = factory.create_server(
+            self.serialized_model, port, self.mode, custom_objects=self.custom_objects
+        )
         self.client = factory.create_client(port)
 
     def get_config(self):
         config = super().get_config()
-        return {**config,
-                'parameter_server_mode': self.parameter_server_mode,
-                'mode': self.mode, 'frequency': self.frequency}
+        return {
+            **config,
+            "parameter_server_mode": self.parameter_server_mode,
+            "mode": self.mode,
+            "frequency": self.frequency,
+        }
 
     def _fit(self, rdd: RDD, **kwargs):
         """Protected train method to make wrapping of modes easier"""
-        self._master_network.compile(optimizer=self.master_optimizer,
-                                     loss=self.master_loss,
-                                     metrics=self.master_metrics)
-        self.start_server()
-        train_config = kwargs
-        freq = self.frequency
-        serialized_optimizer = serialize_optimizer(self.master_optimizer)
-        loss = self.master_loss
-        metrics = self.master_metrics
-        custom = self.custom_objects
+        self._master_network.compile(
+            optimizer=self.master_optimizer,
+            loss=self.master_loss,
+            metrics=self.master_metrics,
+        )
+        with self.run_parameter_server():
+            train_config = kwargs
+            freq = self.frequency
+            serialized_optimizer = serialize_optimizer(self.master_optimizer)
+            loss = self.master_loss
+            metrics = self.master_metrics
+            custom = self.custom_objects
 
-        model_json = self._master_network.to_json()
-        init = self._master_network.get_weights()
-        parameters = rdd.context.broadcast(init)
+            model_json = self._master_network.to_json()
+            init = self._master_network.get_weights()
+            parameters = rdd.context.broadcast(init)
 
-        print('>>> Initialize workers')
-        worker = AsynchronousSparkWorker(
-            model_json, parameters, self.client, train_config, freq, serialized_optimizer, loss, metrics, custom)
-        print('>>> Distribute load')
-        rdd.mapPartitions(worker.train).collect()
-        print('>>> Async training complete.')
-        new_parameters = self.client.get_parameters()
-        self._master_network.set_weights(new_parameters)
-        self.stop_server()
+            print(">>> Initialize workers")
+            worker = AsynchronousSparkWorker(
+                model_json,
+                parameters,
+                self.client,
+                train_config,
+                freq,
+                serialized_optimizer,
+                loss,
+                metrics,
+                custom,
+            )
+            print(">>> Distribute load")
+            rdd.mapPartitions(worker.train).collect()
+            print(">>> Async training complete.")
+            new_parameters = self.client.get_parameters()
+            self._master_network.set_weights(new_parameters)
 
-    def start_server(self):
-        self.parameter_server.start()
-
-    def stop_server(self):
-        self.parameter_server.stop()
+    @contextmanager
+    def run_parameter_server(self):
+        try:
+            self.parameter_server.start()
+            yield
+        finally:
+            self.parameter_server.stop()
 
 
 class SparkMLlibModel(SparkModel):
-
-    def fit(self, labeled_points: RDD, epochs: int = 10, batch_size: int = 32, verbose: int = 0,
-            validation_split: float = 0.1,
-            categorical: bool = False, nb_classes: Optional[int] = None):
-        """Train an elephas model on an RDD of LabeledPoints
-        """
+    def fit(
+        self,
+        labeled_points: RDD,
+        epochs: int = 10,
+        batch_size: int = 32,
+        verbose: int = 0,
+        validation_split: float = 0.1,
+        categorical: bool = False,
+        nb_classes: Optional[int] = None,
+    ):
+        """Train an elephas model on an RDD of LabeledPoints"""
         rdd = lp_to_simple_rdd(labeled_points, categorical, nb_classes)
-        super().fit(rdd=rdd, epochs=epochs, batch_size=batch_size,
-                    verbose=verbose, validation_split=validation_split)
+        super().fit(
+            rdd=rdd,
+            epochs=epochs,
+            batch_size=batch_size,
+            verbose=verbose,
+            validation_split=validation_split,
+        )
 
     def predict(self, mllib_data):
-        """Predict probabilities for an RDD of features
-        """
+        """Predict probabilities for an RDD of features"""
         if isinstance(mllib_data, pyspark.mllib.linalg.Matrix):
             return to_matrix(self.predict(from_matrix(mllib_data)))
         elif isinstance(mllib_data, pyspark.mllib.linalg.Vector):
             return to_vector(self.predict(from_vector(mllib_data)))
         else:
             raise ValueError(
-                'Provide either an MLLib matrix or vector, got {}'.format(mllib_data.__name__))
+                "Provide either an MLLib matrix or vector, got {}".format(
+                    mllib_data.__name__
+                )
+            )
 
 
 def load_spark_model(
-        file_name: str, from_hadoop: bool = False
+    file_name: str, from_hadoop: bool = False
 ) -> Union[SparkModel, SparkMLlibModel]:
     """
     Load an elephas model from a h5 or keras file. Assumes file is located locally by
@@ -362,9 +458,9 @@ def load_spark_model(
     default is False
     :return: SparkModel or SparkMLlibModel, loaded elephas model
     """
-    assert (
-            file_name[-3:] == ".h5" or file_name[-6:] == ".keras"
-    ), "File name must end with either '.h5' or '.keras'"
+    assert file_name[-3:] == ".h5" or file_name[-6:] == ".keras", (
+        "File name must end with either '.h5' or '.keras'"
+    )
 
     if from_hadoop:
         temp_file = str(uuid4()) + "-temp-model-file." + file_name.split(".")[-1]
@@ -391,5 +487,5 @@ def save_and_zip_model(model, temp_dir):
     # Save model to the temporary directory
     model.save_pretrained(temp_dir)
     # Create a zip file of the model directory
-    zip_path = shutil.make_archive(temp_dir, 'zip', temp_dir)
+    zip_path = shutil.make_archive(temp_dir, "zip", temp_dir)
     return zip_path
