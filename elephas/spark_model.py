@@ -405,11 +405,9 @@ class AsynchronousSparkModel(SparkModel):
 
     @contextmanager
     def run_parameter_server(self):
-        try:
-            self.parameter_server.start()
-            yield
-        finally:
-            self.parameter_server.stop()
+        self.parameter_server.start()
+        yield
+        self.parameter_server.stop()
 
 
 class SparkMLlibModel(SparkModel):
