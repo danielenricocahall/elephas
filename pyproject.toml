@@ -59,8 +59,3 @@ exclude = [
     "README.md",
     "CONTRIBUTING.md"
 ]
-
-
-[tool.ruff.lint]
-fixable = ["ALL"]
-unfixable = ["E731"]
