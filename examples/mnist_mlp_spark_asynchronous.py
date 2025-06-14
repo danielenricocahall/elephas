@@ -4,7 +4,7 @@ from tensorflow.keras.layers import Dense, Dropout, Activation
 from tensorflow.keras.optimizers import SGD
 from tensorflow.keras.utils import to_categorical
 
-from elephas.spark_model import SparkModel
+from elephas.spark_model import AsynchronousSparkModel
 from elephas.utils.rdd_utils import to_simple_rdd
 
 from pyspark import SparkContext, SparkConf
@@ -51,7 +51,7 @@ model.compile(sgd, 'categorical_crossentropy', ['acc'])
 rdd = to_simple_rdd(sc, x_train, y_train)
 
 # Initialize SparkModel from tensorflow.keras model and Spark context
-spark_model = SparkModel(model, mode='asynchronous')
+spark_model = AsynchronousSparkModel(model, mode='asynchronous')
 
 # Train Spark model
 spark_model.fit(rdd, epochs=epochs, batch_size=batch_size, verbose=2, validation_split=0.1)

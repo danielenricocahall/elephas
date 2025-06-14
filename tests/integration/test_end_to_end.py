@@ -1,4 +1,6 @@
 import os
+import random
+import socket
 from itertools import count
 from math import isclose
 
@@ -12,15 +14,20 @@ from tensorflow.keras.layers import Embedding, Flatten, Dot
 
 from elephas.enums.modes import Mode
 from elephas.enums.frequency import Frequency
-from elephas.spark_model import SparkModel
+from elephas.spark_model import SparkModel, AsynchronousSparkModel
 from elephas.utils.rdd_utils import to_simple_rdd
 
 import pytest
 import numpy as np
 
 
-def _generate_port_number(port=3000, _count=count(1)):
-    return port + next(_count)
+@pytest.fixture
+def unused_tcp_port():
+    """Finds and returns an unused TCP port."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(('', 0))  # Let OS pick an available port
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        return s.getsockname()[1]
 
 
 COMBINATIONS = [(Mode.SYNCHRONOUS, None, None),
@@ -39,7 +46,7 @@ COMBINATIONS = [(Mode.SYNCHRONOUS, None, None),
 # validatiing multiple workers for repartitioning
 @pytest.mark.parametrize('mode,parameter_server_mode,num_workers', COMBINATIONS)
 def test_training_classification(spark_context, mode, parameter_server_mode, num_workers, mnist_data,
-                                 classification_model):
+                                 classification_model, unused_tcp_port):
     # Define basic parameters
     batch_size = 64
     epochs = 10
@@ -56,9 +63,11 @@ def test_training_classification(spark_context, mode, parameter_server_mode, num
     rdd = to_simple_rdd(spark_context, x_train, y_train)
 
     # Initialize SparkModel from keras model and Spark context
-    spark_model = SparkModel(classification_model, frequency='epoch', num_workers=num_workers,
-                             mode=mode, parameter_server_mode=parameter_server_mode, port=_generate_port_number())
-
+    if mode == Mode.SYNCHRONOUS:
+        spark_model = SparkModel(classification_model, num_workers=num_workers)
+    else:
+        spark_model = AsynchronousSparkModel(classification_model, frequency='epoch', num_workers=num_workers,
+                                  mode=mode, parameter_server_mode=parameter_server_mode, port=unused_tcp_port)
     # Train Spark model
     spark_model.fit(rdd, epochs=epochs, batch_size=batch_size,
                     verbose=0, validation_split=0.1)
@@ -84,7 +93,7 @@ def test_training_classification(spark_context, mode, parameter_server_mode, num
 # multiple workers for repartitioning
 @pytest.mark.parametrize('mode,parameter_server_mode,num_workers', COMBINATIONS)
 def test_training_regression(spark_context, mode, parameter_server_mode, num_workers, boston_housing_dataset,
-                             regression_model):
+                             regression_model, unused_tcp_port):
     x_train, y_train, x_test, y_test = boston_housing_dataset
     rdd = to_simple_rdd(spark_context, x_train, y_train)
 
@@ -93,8 +102,12 @@ def test_training_regression(spark_context, mode, parameter_server_mode, num_wor
     epochs = 10
     sgd = Adam()
     regression_model.compile(sgd, 'mse', ['mae', 'mean_absolute_percentage_error'])
-    spark_model = SparkModel(regression_model, frequency='epoch', mode=mode, num_workers=num_workers,
-                             parameter_server_mode=parameter_server_mode, port=_generate_port_number())
+
+    if mode == Mode.SYNCHRONOUS:
+        spark_model = SparkModel(regression_model, num_workers=num_workers)
+    else:
+        spark_model = AsynchronousSparkModel(regression_model, frequency='epoch', num_workers=num_workers,
+                                  mode=mode, parameter_server_mode=parameter_server_mode, port=unused_tcp_port)
 
     # Train Spark model
     spark_model.fit(rdd, epochs=epochs, batch_size=batch_size,
@@ -116,7 +129,7 @@ def test_training_regression(spark_context, mode, parameter_server_mode, num_wor
     assert isclose(evals, spark_model.master_network.evaluate(x_test, y_test), abs_tol=0.01)
 
 
-def test_training_regression_no_metrics(spark_context, boston_housing_dataset, regression_model):
+def test_training_regression_no_metrics(spark_context, boston_housing_dataset, regression_model, unused_tcp_port):
     x_train, y_train, x_test, y_test = boston_housing_dataset
     rdd = to_simple_rdd(spark_context, x_train, y_train)
 
@@ -125,7 +138,7 @@ def test_training_regression_no_metrics(spark_context, boston_housing_dataset, r
     epochs = 1
     sgd = Adam()
     regression_model.compile(sgd, 'mse')
-    spark_model = SparkModel(regression_model, frequency='epoch', mode=Mode.SYNCHRONOUS, port=_generate_port_number())
+    spark_model = SparkModel(regression_model, frequency='epoch', mode=Mode.SYNCHRONOUS, port=unused_tcp_port)
 
     # Train Spark model
     spark_model.fit(rdd, epochs=epochs, batch_size=batch_size, verbose=0, validation_split=0.1)
@@ -146,7 +159,7 @@ def test_training_regression_no_metrics(spark_context, boston_housing_dataset, r
 
 
 @pytest.mark.parametrize('frequency', [Frequency.EPOCH, Frequency.BATCH])
-def test_multiple_input_model(spark_session, frequency):
+def test_multiple_input_model(spark_session, frequency, unused_tcp_port):
     def row_to_tuple(row):
         return [row.user_id_encoded, row.track_id_encoded], row.frequency
 
@@ -180,7 +193,7 @@ def test_multiple_input_model(spark_session, frequency):
 
     rdd_final = df_transformed.rdd.map(row_to_tuple)
 
-    spark_model = SparkModel(model, frequency=frequency, mode=Mode.ASYNCHRONOUS, port=_generate_port_number())
+    spark_model = AsynchronousSparkModel(model, mode=Mode.ASYNCHRONOUS, frequency=frequency, port=unused_tcp_port)
     spark_model.fit(rdd_final, epochs=5, batch_size=32, verbose=0, validation_split=0.1)
     rdd_test_data = rdd_final.map(lambda x: x[0])
     rdd_test_targets = rdd_final.map(lambda x: x[1])

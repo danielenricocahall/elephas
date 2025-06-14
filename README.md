@@ -104,9 +104,11 @@ an update frequency and a parallelization mode. After that you can simply `fit` 
 has the same options as a Keras model, so you can pass `epochs`, `batch_size` etc. as you're used to from tensorflow.keras.
 
 ```python
-from elephas.spark_model import SparkModel
+from elephas.spark_model import SparkModel, AsynchronousSparkModel
 
-spark_model = SparkModel(model, frequency='epoch', mode='asynchronous')
+spark_model = SparkModel(model)
+# or, if you want use the asynchronous training paradigm
+# spark_model = AsynchronousSparkModel(model, frequency='epoch', mode='asynchronous')
 spark_model.fit(rdd, epochs=20, batch_size=32, verbose=0, validation_split=0.1)
 ```
 
