@@ -1,19 +1,6 @@
-"""
-Modified parameter server with safe JSON deserialization
-========================================================
-Changes (★)   – all comments/descriptions added in English
-----------------------------------------------------------
-* ★ Added `import json, numpy as np`
-* ★ Replaced **unsafe** `pickle.loads(request.data)` with
-      a JSON‒based parser + dtype/shape validation
-* ★ Kept the asynchronous read/write locks exactly as before
-* ★ Response codes: 400 on bad JSON, 200 on success
-The rest of the implementation is untouched.
-"""
-
 import abc
-import json            # ★ new: safe parsing for /update
-import numpy as np     # ★ new: convert lists → ndarray
+import json
+import numpy as np
 import pickle
 import socket
 from functools import wraps
@@ -120,11 +107,6 @@ class HttpServer(BaseParameterServer):
         @app.route("/update", methods=["POST"])
         @self.make_write_threadsafe_if_necessary
         def handle_update_parameters():
-            """
-            ★ Secure replacement for the old pickle.loads deserialization.
-            Parse JSON, convert each list to a NumPy array (`float32`)
-            and reject anything invalid with HTTP 400.
-            """
             try:
                 delta_json = json.loads(request.data.decode())
                 delta = [np.asarray(t, dtype=np.float32) for t in delta_json]
