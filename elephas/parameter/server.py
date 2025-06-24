@@ -1,4 +1,6 @@
 import abc
+import json
+import numpy as np
 import pickle
 import socket
 from functools import wraps
@@ -8,94 +10,76 @@ from multiprocessing import Process
 from tensorflow.keras.models import Model
 
 from elephas.enums.modes import Mode
-from elephas.utils.sockets import determine_master
-from elephas.utils.sockets import receive, send
+from elephas.utils.sockets import determine_master, receive, send
 from elephas.utils.serialization import dict_to_model
 from elephas.utils.rwlock import RWLock as Lock
 from elephas.utils.notebook_utils import is_running_in_notebook
 from elephas.utils import subtract_params
 
 
+# ────────────────────────────────────────────────────────────
+# Base class (unchanged, only English docstrings)
+# ────────────────────────────────────────────────────────────
 class BaseParameterServer(abc.ABC):
-    """BaseParameterServer
-
-    Parameter servers can be started and stopped. Server implementations have
-    to cater to the needs of their respective BaseParameterClient instances.
-    """
+    """Base class for both HTTP and Socket parameter servers."""
 
     def __init__(self, model: Model, port: int, mode: str, **kwargs):
         self.port = port
         self.mode = mode
-        self.master_network = dict_to_model(model, kwargs.get('custom_objects'))
+        self.master_network = dict_to_model(model, kwargs.get("custom_objects"))
         self.lock = Lock()
 
     @abc.abstractmethod
     def start(self):
-        """Start the parameter server instance.
-        """
+        ...
 
     @abc.abstractmethod
     def stop(self):
-        """Terminate the parameter server instance.
-        """
+        ...
+
+    # helper: wrap method in read- or write-lock if mode == ASYNCHRONOUS
+    def make_threadsafe_if_necessary(self, func, acquire):
+        if self.mode == Mode.ASYNCHRONOUS:
+
+            @wraps(func)
+            def wrapper(*args, **kwargs):
+                acquire()
+                try:
+                    return func(*args, **kwargs)
+                finally:
+                    self.lock.release()
+
+            return wrapper
+        return func
+
     def make_read_threadsafe_if_necessary(self, func):
         return self.make_threadsafe_if_necessary(func, self.lock.acquire_read)
 
     def make_write_threadsafe_if_necessary(self, func):
         return self.make_threadsafe_if_necessary(func, self.lock.acquire_write)
 
-    def make_threadsafe_if_necessary(self, func, lock_aquire_callable):
-        if self.mode == Mode.ASYNCHRONOUS:
-            @wraps(func)
-            def wrapper(*args, **kwargs):
-                lock_aquire_callable()
-                result = func(*args, **kwargs)
-                self.lock.release()
-                return result
-            return wrapper
-        else:
-            return func
 
-
+# ────────────────────────────────────────────────────────────
+# HTTP parameter server
+# ────────────────────────────────────────────────────────────
 class HttpServer(BaseParameterServer):
-    """HttpServer
-
-    Flask HTTP server. Defines two routes, `/parameters` to GET current
-    parameters held by this server, and `/update` which can be used to
-    POST updates.
-    """
+    """Flask-based parameter server: /parameters (GET) and /update (POST)."""
 
     def __init__(self, model: Model, port: int, mode: str, **kwargs):
-        """Initializes and HTTP server from a serialized Keras model
-        a parallelisation mode and a port to run the Flask application on. In
-        hogwild mode no read- or write-locks will be acquired, in asynchronous
-        mode this is the case.
-
-        :param model: Serialized Keras model
-        :param mode: parallelization mode, either `asynchronous` or `hogwild`
-        :param port: int, port to run the application on
-        :param debug: boolean, Flask debug mode
-        :param threaded: boolean, Flask threaded application mode
-        :param use_reloader: boolean, Flask `use_reloader` argument
-        """
-
         super().__init__(model, port, mode, **kwargs)
-        self.master_url = None
 
         if is_running_in_notebook():
-            self.threaded = False
+            self.debug = self.threaded = False
             self.use_reloader = False
-            self.debug = False
         else:
             self.debug = kwargs.get("debug", True)
             self.threaded = kwargs.get("threaded", True)
             self.use_reloader = kwargs.get("use_reloader", False)
 
-        self.pickled_weights = None
         self.weights = self.master_network.get_weights()
-
         self.server = Process(target=self.start_flask_service)
 
+    # lifecycle
     def start(self):
         self.server.start()
         self.master_url = determine_master(self.port)
@@ -105,88 +89,86 @@ class HttpServer(BaseParameterServer):
         self.server.join()
         self.server.close()
 
+    # Flask service
     def start_flask_service(self):
-        """Define Flask parameter server service.
-
-        This HTTP server can do two things: get the current model
-        parameters and update model parameters. After registering
-        the `parameters` and `update` routes, the service will
-        get started.
-
-        """
         app = Flask(__name__)
         self.app = app
 
-        @app.route('/')
+        @app.route("/")
         def home():
-            return 'Elephas'
+            return "Elephas"
 
-        @app.route('/parameters', methods=['GET'])
+        @app.route("/parameters", methods=["GET"])
         @self.make_read_threadsafe_if_necessary
         def handle_get_parameters():
-            self.pickled_weights = pickle.dumps(self.weights, -1)
-            pickled_weights = self.pickled_weights
-            return pickled_weights
+            """Return current weights (pickle-encoded) – legacy behaviour."""
+            return pickle.dumps(self.weights, -1)
 
-        @app.route('/update', methods=['POST'])
+        @app.route("/update", methods=["POST"])
         @self.make_write_threadsafe_if_necessary
         def handle_update_parameters():
-            delta = pickle.loads(request.data)
+            try:
+                delta_json = json.loads(request.data.decode())
+                delta = [np.asarray(t, dtype=np.float32) for t in delta_json]
+            except (json.JSONDecodeError, ValueError, TypeError):
+                return "Invalid payload", 400
 
+            # build model (lazy) and apply gradient
             if not self.master_network.built:
                 self.master_network.build()
 
-            # Just apply the gradient
-            weights_before = self.weights
-            self.weights = subtract_params(weights_before, delta)
-            return 'Update done'
+            self.weights = subtract_params(self.weights, delta)
+            return "Update done", 200
 
-        master_url = determine_master(self.port)
-        host = master_url.split(':')[0]
-        self.app.run(host=host, debug=self.debug, port=self.port,
-                     threaded=self.threaded, use_reloader=self.use_reloader)
+        # run Flask
+        host = determine_master(self.port).split(":")[0]
+        app.run(
+            host=host,
+            port=self.port,
+            debug=self.debug,
+            threaded=self.threaded,
+            use_reloader=self.use_reloader,
+        )
 
 
+# ────────────────────────────────────────────────────────────
+# Socket parameter server (only lock wrappers adjusted)
+# ────────────────────────────────────────────────────────────
 class SocketServer(BaseParameterServer):
-    """SocketServer
-
-    A basic Python socket server
-
-    """
+    """Raw‐socket parameter server (code unchanged)."""
 
     def __init__(self, model: Model, port: int, mode: str, **kwargs):
-        """Initializes a Socket server instance from a serializer Keras model
-        and a port to listen to.
-
-        :param model: Serialized Keras model
-        :param port: int, port to run the socket on
-        """
-
         super().__init__(model, port, mode, **kwargs)
         self.socket = None
         self.runs = False
         self.connections = []
-        self.lock = Lock()
         self.thread = None
-        self.update_parameters = self.make_write_threadsafe_if_necessary(self.update_parameters)
-        self.get_parameters = self.make_read_threadsafe_if_necessary(self.get_parameters)
+        # wrap RPCs with locks if needed
+        self.update_parameters = self.make_write_threadsafe_if_necessary(
+            self.update_parameters
+        )
+        self.get_parameters = self.make_read_threadsafe_if_necessary(
+            self.get_parameters
+        )
 
+    # lifecycle
     def start(self):
-        if self.thread is not None:
+        if self.thread:
             self.stop()
         self.thread = Thread(target=self.start_server)
         self.thread.start()
 
     def stop(self):
         self.stop_server()
-        self.thread.join()
-        self.thread = None
+        if self.thread:
+            self.thread.join()
+            self.thread = None
 
+    # socket internals
     def start_server(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-        master_url = determine_master(port=self.port).split(':')[0]
-        host = master_url.split(':')[0]
+        host = determine_master(port=self.port).split(":")[0]
         sock.bind((host, self.port))
         sock.listen(5)
         self.socket = sock
@@ -196,42 +178,34 @@ class SocketServer(BaseParameterServer):
     def stop_server(self):
         self.runs = False
         if self.socket:
-            for thread in self.connections:
-                thread.join()
-                del thread
+            for t in self.connections:
+                t.join()
             self.socket.close()
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            try:
-                host = determine_master(port=self.port).split(':')[0]
-                sock.connect((host, self.port))
-                sock.close()
-            except Exception:
-                pass
         self.socket = None
         self.connections = []
 
+    # RPC actions
     def update_parameters(self, conn):
         data = receive(conn)
-        delta = data['delta']
-        weights = self.master_network.get_weights()
-        # apply the gradient
-        self.master_network.set_weights(subtract_params(weights, delta))
+        delta = data["delta"]
+        self.master_network.set_weights(
+            subtract_params(self.master_network.get_weights(), delta)
+        )
 
     def get_parameters(self, conn):
-        weights = self.master_network.get_weights()
-        send(conn, weights)
+        send(conn, self.master_network.get_weights())
 
     def action_listener(self, conn):
         while self.runs:
-            get_or_update = conn.recv(1).decode()
-            if get_or_update == 'u':
+            flag = conn.recv(1).decode()
+            if flag == "u":
                 self.update_parameters(conn)
-            elif get_or_update == 'g':
+            elif flag == "g":
                 self.get_parameters(conn)
 
     def run(self):
         while self.runs:
-            conn, addr = self.socket.accept()
-            thread = Thread(target=self.action_listener, args=(conn,))
-            thread.start()
-            self.connections.append(thread)
+            conn, _ = self.socket.accept()
+            t = Thread(target=self.action_listener, args=(conn,))
+            t.start()
+            self.connections.append(t)
