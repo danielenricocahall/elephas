@@ -25,7 +25,11 @@ from .enums.modes import Mode
 from .enums.frequency import Frequency
 from .mllib import to_matrix, from_matrix, to_vector, from_vector
 from .parameter.factory import ClientServerFactory
-from .utils import lp_to_simple_rdd, to_simple_rdd
+from .utils import (
+    lp_to_simple_rdd,
+    to_simple_rdd,
+    accumulate_model_gradients_and_history,
+)
 from .utils import model_to_dict
 from .utils import subtract_params, divide_by
 from .utils.model_utils import is_multiple_input_model, is_multiple_output_model
@@ -200,16 +204,19 @@ class SparkModel:
                 metrics,
                 custom,
             )
-            training_outcomes = rdd.mapPartitions(worker.train).collect()
-            new_parameters = self._master_network.get_weights()
-            number_of_sub_models = len(training_outcomes)
-            for training_outcome in training_outcomes:
-                grad, history = training_outcome
+            aggregated_gradients, history = rdd.mapPartitions(worker.train).reduce(
+                accumulate_model_gradients_and_history
+            )
+            averaged_gradients = divide_by(
+                aggregated_gradients, len(aggregated_gradients)
+            )
+            new_parameters = subtract_params(
+                self._master_network.get_weights(), averaged_gradients
+            )
+            if history:
                 self.training_histories.append(history)
-                weighted_grad = divide_by(grad, number_of_sub_models)
-                new_parameters = subtract_params(new_parameters, weighted_grad)
-            print(">>> Synchronous training complete.")
             self._master_network.set_weights(new_parameters)
+        print(">>> Synchronous training complete.")
 
     def _predict(self, rdd: RDD) -> List[np.ndarray]:
         """
