@@ -47,9 +47,9 @@ def divide_by(array_list: List[np.array], num_workers: int) -> List[np.array]:
     return [x / num_workers for x in array_list]
 
 
-def accumulate_model_gradients_and_history(x, y):
-    state_dict, history = x
-    other_state_dict, other_history = y
-    updated_state = add_params(state_dict, other_state_dict)
+def accumulate_model_parameters_and_history(x, y):
+    model, history = x
+    other_model, other_history = y
+    combined_model = add_params(model, other_model)
     combined_history = {k: v + other_history[k] for k, v in history.items()}
-    return updated_state, combined_history
+    return combined_model, combined_history

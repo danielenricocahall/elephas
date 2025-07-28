@@ -28,10 +28,10 @@ from .parameter.factory import ClientServerFactory
 from .utils import (
     lp_to_simple_rdd,
     to_simple_rdd,
-    accumulate_model_gradients_and_history,
+    accumulate_model_parameters_and_history,
 )
 from .utils import model_to_dict
-from .utils import subtract_params, divide_by
+from .utils import divide_by
 from .utils.model_utils import is_multiple_input_model, is_multiple_output_model
 from .worker import AsynchronousSparkWorker, SparkWorker
 
@@ -204,18 +204,15 @@ class SparkModel:
                 metrics,
                 custom,
             )
-            aggregated_gradients, history = rdd.mapPartitions(worker.train).reduce(
-                accumulate_model_gradients_and_history
+            aggregated_parameters, history = rdd.mapPartitions(worker.train).reduce(
+                accumulate_model_parameters_and_history
             )
-            averaged_gradients = divide_by(
-                aggregated_gradients, len(aggregated_gradients)
-            )
-            new_parameters = subtract_params(
-                self._master_network.get_weights(), averaged_gradients
+            averaged_parameters = divide_by(
+                aggregated_parameters, len(aggregated_parameters)
             )
             if history:
                 self.training_histories.append(history)
-            self._master_network.set_weights(new_parameters)
+            self._master_network.set_weights(averaged_parameters)
         print(">>> Synchronous training complete.")
 
     def _predict(self, rdd: RDD) -> List[np.ndarray]:

@@ -51,15 +51,13 @@ class SparkWorker(object):
             x_train = np.hsplit(x_train, len(self.model.input_shape))
         if is_multiple_output_model(self.model):
             y_train = np.hsplit(y_train, len(self.model.output_shape))
-        weights_before_training = self.model.get_weights()
         if x_train.shape[0] > self.train_config.get("batch_size"):
             history = self.model.fit(x_train, y_train, **self.train_config)
         weights_after_training = self.model.get_weights()
-        deltas = subtract_params(weights_before_training, weights_after_training)
         if history:
-            yield [deltas, history.history]
+            yield [weights_after_training, history.history]
         else:
-            yield [deltas, None]
+            yield [weights_after_training, None]
 
 
 class AsynchronousSparkWorker:
