@@ -165,7 +165,6 @@ def test_training_regression(
     )
 
 
-@pytest.mark.skip(reason="test")
 def test_training_regression_no_metrics(
     spark_context, boston_housing_dataset, regression_model, unused_tcp_port
 ):
