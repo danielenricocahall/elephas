@@ -105,7 +105,6 @@ def test_training_classification(
 # enumerate possible combinations for training mode and parameter server for a regression model while also validating
 # multiple workers for repartitioning
 @pytest.mark.parametrize("mode,parameter_server_mode,num_workers", COMBINATIONS)
-@pytest.mark.skip(reason="test")
 def test_training_regression(
     spark_context,
     mode,
