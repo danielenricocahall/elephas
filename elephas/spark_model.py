@@ -208,11 +208,12 @@ class SparkModel:
                 accumulate_model_parameters_and_history
             )
             averaged_parameters = divide_by(
-                aggregated_parameters, len(aggregated_parameters)
+                aggregated_parameters, self.num_workers or 1
             )
             if history:
                 self.training_histories.append(history)
             self._master_network.set_weights(averaged_parameters)
+            parameters.destroy()
         print(">>> Synchronous training complete.")
 
     def _predict(self, rdd: RDD) -> List[np.ndarray]:
