@@ -8,10 +8,10 @@ from tensorflow.keras.utils import to_categorical
 @pytest.fixture
 def classification_model():
     model = Sequential()
-    model.add(Dense(32, input_dim=784))
+    model.add(Dense(16, input_dim=784))
     model.add(Activation("relu"))
     model.add(Dropout(0.2))
-    model.add(Dense(16))
+    model.add(Dense(8))
     model.add(Activation("relu"))
     model.add(Dropout(0.2))
     model.add(Dense(10))
@@ -22,8 +22,8 @@ def classification_model():
 @pytest.fixture
 def regression_model():
     model = Sequential()
-    model.add(Dense(64, activation="relu", input_shape=(13,)))
-    model.add(Dense(64, activation="relu"))
+    model.add(Dense(32, activation="relu", input_shape=(13,)))
+    model.add(Dense(32, activation="relu"))
     model.add(Dense(1, activation="linear"))
     return model
 
