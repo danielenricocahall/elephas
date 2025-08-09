@@ -22,8 +22,8 @@ def classification_model():
 @pytest.fixture
 def regression_model():
     model = Sequential()
-    model.add(Dense(32, activation="relu", input_shape=(13,)))
-    model.add(Dense(32, activation="relu"))
+    model.add(Dense(16, activation="relu", input_shape=(13,)))
+    model.add(Dense(16, activation="relu"))
     model.add(Dense(1, activation="linear"))
     return model
 

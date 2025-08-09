@@ -51,8 +51,8 @@ def test_training_classification(
 
     # Load data
     x_train, y_train, x_test, y_test = mnist_data
-    x_train = x_train[:1000]
-    y_train = y_train[:1000]
+    x_train = x_train[:250]
+    y_train = y_train[:250]
 
     sgd = SGD(learning_rate=0.1)
     classification_model.compile(sgd, "categorical_crossentropy", metrics=["acc"])
