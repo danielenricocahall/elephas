@@ -19,7 +19,7 @@ import numpy as np
 
 
 COMBINATIONS = [
-    (Mode.SYNCHRONOUS, None, None),
+    (Mode.SYNCHRONOUS, None, 1),
     (Mode.SYNCHRONOUS, None, 2),
     (Mode.ASYNCHRONOUS, "http", None),
     (Mode.ASYNCHRONOUS, "http", 2),
