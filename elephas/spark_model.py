@@ -192,8 +192,9 @@ class SparkModel:
         model_json = self._master_network.to_json()
         epochs = train_config.get("epochs", 1)
         train_config["epochs"] = 1
+        updated_model_weights = self._master_network.get_weights()
         for epoch in range(epochs):
-            parameters = rdd.context.broadcast(self._master_network.get_weights())
+            parameters = rdd.context.broadcast(updated_model_weights)
 
             worker = SparkWorker(
                 model_json,
@@ -208,12 +209,13 @@ class SparkModel:
                 accumulate_model_parameters_and_history
             )
             averaged_parameters = divide_by(
-                aggregated_parameters, self.num_workers or 1
+                aggregated_parameters, self.num_workers or rdd.getNumPartitions()
             )
             if history:
                 self.training_histories.append(history)
-            self._master_network.set_weights(averaged_parameters)
+            updated_model_weights = averaged_parameters
             parameters.destroy()
+        self._master_network.set_weights(updated_model_weights)
         print(">>> Synchronous training complete.")
 
     def _predict(self, rdd: RDD) -> List[np.ndarray]:
