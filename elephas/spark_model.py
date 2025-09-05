@@ -25,11 +25,7 @@ from .enums.modes import Mode
 from .enums.frequency import Frequency
 from .mllib import to_matrix, from_matrix, to_vector, from_vector
 from .parameter.factory import ClientServerFactory
-from .utils import (
-    lp_to_simple_rdd,
-    to_simple_rdd,
-    accumulate_model_parameters_and_history,
-)
+from .utils import lp_to_simple_rdd, to_simple_rdd, subtract_params
 from .utils import model_to_dict
 from .utils import divide_by
 from .utils.model_utils import is_multiple_input_model, is_multiple_output_model
@@ -192,30 +188,34 @@ class SparkModel:
         model_json = self._master_network.to_json()
         epochs = train_config.get("epochs", 1)
         train_config["epochs"] = 1
-        updated_model_weights = self._master_network.get_weights()
-        for epoch in range(epochs):
-            parameters = rdd.context.broadcast(updated_model_weights)
+        rdd.cache()
+        rdd.count()
+        parameters = rdd.context.broadcast(self._master_network.get_weights())
 
-            worker = SparkWorker(
-                model_json,
-                parameters,
-                train_config,
-                serialized_optimizer,
-                loss,
-                metrics,
-                custom,
-            )
-            aggregated_parameters, history = rdd.mapPartitions(worker.train).reduce(
-                accumulate_model_parameters_and_history
-            )
-            averaged_parameters = divide_by(
-                aggregated_parameters, self.num_workers or rdd.getNumPartitions()
-            )
-            if history:
-                self.training_histories.append(history)
-            updated_model_weights = averaged_parameters
-            parameters.destroy()
-        self._master_network.set_weights(updated_model_weights)
+        for epoch in range(epochs):
+            try:
+                worker = SparkWorker(
+                    model_json,
+                    parameters,
+                    train_config,
+                    serialized_optimizer,
+                    loss,
+                    metrics,
+                    custom,
+                )
+                training_outcomes = rdd.mapPartitions(worker.train).collect()
+                new_parameters = [w.copy() for w in parameters.value]
+                number_of_sub_models = len(training_outcomes)
+                for training_outcome in training_outcomes:
+                    grad, history = training_outcome
+                    self.training_histories.append(history)
+                    weighted_grad = divide_by(grad, number_of_sub_models)
+                    new_parameters = subtract_params(new_parameters, weighted_grad)
+            finally:
+                parameters.destroy()
+            parameters = rdd.context.broadcast(new_parameters)
+        self._master_network.set_weights(parameters.value)
+        rdd.unpersist()
         print(">>> Synchronous training complete.")
 
     def _predict(self, rdd: RDD) -> List[np.ndarray]:
