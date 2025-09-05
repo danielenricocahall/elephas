@@ -36,16 +36,6 @@ class SparkWorker(object):
 
     def train(self, data_iterator):
         """Train a keras model on a worker"""
-
-        feature_iterator, label_iterator = tee(data_iterator, 2)
-        x_train = np.asarray([x for x, y in feature_iterator])
-        y_train = np.asarray([y for x, y in label_iterator])
-        batch_size = self.train_config.get("batch_size", 32)
-
-        if x_train.size == 0 or x_train.shape[0] < batch_size:
-            yield [self.parameters.value, None]
-            return
-
         history = None
         optimizer = deserialize_optimizer(self.master_optimizer)
         self.model = model_from_json(self.json, self.custom_objects)
@@ -54,17 +44,22 @@ class SparkWorker(object):
         )
         self.model.set_weights(self.parameters.value)
 
+        feature_iterator, label_iterator = tee(data_iterator, 2)
+        x_train = np.asarray([x for x, y in feature_iterator])
+        y_train = np.asarray([y for x, y in label_iterator])
         if is_multiple_input_model(self.model):
             x_train = np.hsplit(x_train, len(self.model.input_shape))
         if is_multiple_output_model(self.model):
             y_train = np.hsplit(y_train, len(self.model.output_shape))
-        if x_train.shape[0] >= batch_size:
+        weights_before_training = self.model.get_weights()
+        if x_train.shape[0] > self.train_config.get("batch_size"):
             history = self.model.fit(x_train, y_train, **self.train_config)
         weights_after_training = self.model.get_weights()
+        deltas = subtract_params(weights_before_training, weights_after_training)
         if history:
-            yield [weights_after_training, history.history]
+            yield [deltas, history.history]
         else:
-            yield [weights_after_training, None]
+            yield [deltas, None]
 
 
 class AsynchronousSparkWorker:
@@ -136,7 +131,7 @@ class AsynchronousSparkWorker:
                 weights_before_training = self.client.get_parameters()
                 self.model.set_weights(weights_before_training)
                 self.train_config["epochs"] = 1
-                if nb_train_sample >= batch_size:
+                if nb_train_sample > batch_size:
                     self.model.fit(x_train, y_train, **self.train_config)
                 self.train_config["epochs"] = epochs
                 weights_after_training = self.model.get_weights()
@@ -146,7 +141,7 @@ class AsynchronousSparkWorker:
                 self.client.update_parameters(deltas)
         elif self.frequency == Frequency.BATCH:
             for epoch in range(epochs):
-                if nb_train_sample >= batch_size:
+                if nb_train_sample > batch_size:
                     for batch_start, batch_end in batches:
                         weights_before_training = self.client.get_parameters()
                         self.model.set_weights(weights_before_training)
