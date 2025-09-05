@@ -35,7 +35,6 @@ COMBINATIONS = [
 # enumerate possible combinations for training mode and parameter server for a classification model while also
 # validatiing multiple workers for repartitioning
 @pytest.mark.parametrize("mode,parameter_server_mode,num_workers", COMBINATIONS)
-@pytest.mark.skip(reason="test")
 def test_training_classification(
     spark_context,
     mode,
@@ -47,7 +46,7 @@ def test_training_classification(
 ):
     # Define basic parameters
     batch_size = 64
-    epochs = 1
+    epochs = 10
 
     # Load data
     x_train, y_train, x_test, y_test = mnist_data
@@ -119,7 +118,7 @@ def test_training_regression(
 
     # Define basic parameters
     batch_size = 32
-    epochs = 1
+    epochs = 10
     sgd = Adam()
     regression_model.compile(sgd, "mse", ["mae", "mean_absolute_percentage_error"])
 
