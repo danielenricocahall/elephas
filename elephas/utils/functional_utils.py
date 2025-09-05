@@ -3,7 +3,9 @@ from typing import List
 import numpy as np
 
 
-def add_params(param_list_left: List[np.array], param_list_right: List[np.array]) -> List[np.array]:
+def add_params(
+    param_list_left: List[np.array], param_list_right: List[np.array]
+) -> List[np.array]:
     """Add two lists of parameters one by one
 
     :param param_list_left: list of numpy arrays
@@ -13,7 +15,9 @@ def add_params(param_list_left: List[np.array], param_list_right: List[np.array]
     return [x + y for x, y in zip(param_list_left, param_list_right)]
 
 
-def subtract_params(param_list_left: List[np.array], param_list_right: List[np.array]) -> List[np.array]:
+def subtract_params(
+    param_list_left: List[np.array], param_list_right: List[np.array]
+) -> List[np.array]:
     """Subtract two lists of parameters
 
     :param param_list_left: list of numpy arrays
