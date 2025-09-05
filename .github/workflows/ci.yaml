@@ -13,8 +13,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    container:
-      image: mcr.microsoft.com/devcontainers/base:ubuntu24@sha256:20250609.1.0
     strategy:
       matrix:
         python-version: ["3.9", "3.10", "3.11", "3.12"]
