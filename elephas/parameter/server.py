@@ -95,7 +95,6 @@ class HttpServer(BaseParameterServer):
             self.threaded = kwargs.get("threaded", True)
             self.use_reloader = kwargs.get("use_reloader", False)
 
-        self.pickled_weights = None
         self.weights = self.master_network.get_weights()
 
         self.server = Process(target=self.start_flask_service)
