@@ -31,21 +31,12 @@ def unused_tcp_port():
 COMBINATIONS = [
     (Mode.SYNCHRONOUS, None, None),
     (Mode.SYNCHRONOUS, None, 2),
-    (Mode.ASYNCHRONOUS, "http", None),
-    (Mode.ASYNCHRONOUS, "http", 2),
-    (Mode.ASYNCHRONOUS, "socket", None),
-    (Mode.ASYNCHRONOUS, "socket", 2),
-    (Mode.HOGWILD, "http", None),
-    (Mode.HOGWILD, "http", 2),
-    (Mode.HOGWILD, "socket", None),
-    (Mode.HOGWILD, "socket", 2),
 ]
 
 
 # enumerate possible combinations for training mode and parameter server for a classification model while also
 # validatiing multiple workers for repartitioning
 @pytest.mark.parametrize("mode,parameter_server_mode,num_workers", COMBINATIONS)
-@pytest.mark.skip(reason="testing")
 def test_training_classification(
     spark_context,
     mode,
@@ -115,7 +106,6 @@ def test_training_classification(
 # enumerate possible combinations for training mode and parameter server for a regression model while also validating
 # multiple workers for repartitioning
 @pytest.mark.parametrize("mode,parameter_server_mode,num_workers", COMBINATIONS)
-@pytest.mark.skip(reason="testing")
 def test_training_regression(
     spark_context,
     mode,
