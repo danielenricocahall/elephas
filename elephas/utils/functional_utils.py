@@ -45,14 +45,3 @@ def divide_by(array_list: List[np.array], num_workers: int) -> List[np.array]:
     :return:
     """
     return [x / num_workers for x in array_list]
-
-
-def accumulate_model_parameters_and_history(x, y):
-    model, history = x
-    other_model, other_history = y
-    combined_model = add_params(model, other_model)
-    if history:
-        combined_history = {k: v + other_history[k] for k, v in history.items()}
-    else:
-        combined_history = None
-    return combined_model, combined_history
