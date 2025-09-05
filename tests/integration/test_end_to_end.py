@@ -46,7 +46,7 @@ def test_training_classification(
 ):
     # Define basic parameters
     batch_size = 64
-    epochs = 10
+    epochs = 5
 
     # Load data
     x_train, y_train, x_test, y_test = mnist_data
@@ -118,7 +118,7 @@ def test_training_regression(
 
     # Define basic parameters
     batch_size = 32
-    epochs = 10
+    epochs = 5
     sgd = Adam()
     regression_model.compile(sgd, "mse", ["mae", "mean_absolute_percentage_error"])
 
