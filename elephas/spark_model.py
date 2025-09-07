@@ -66,7 +66,6 @@ class SparkModel:
             custom_objects = {}
         self.num_workers = num_workers
         self.weights = self._master_network.get_weights()
-        self.pickled_weights = None
         self.master_optimizer = model.optimizer
         self.master_loss = loss
         self.master_metrics = metrics

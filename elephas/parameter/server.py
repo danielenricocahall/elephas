@@ -1,16 +1,19 @@
 import abc
-import pickle
 import socket
 from functools import wraps
 from threading import Thread
-from flask import Flask, request
+from flask import Flask, request, Response
 from multiprocessing import Process
 from tensorflow.keras.models import Model
 
 from elephas.enums.modes import Mode
 from elephas.utils.sockets import determine_master
-from elephas.utils.sockets import receive, send
-from elephas.utils.serialization import dict_to_model
+from elephas.utils.sockets import recv_bytes, send_bytes
+from elephas.utils.serialization import (
+    dict_to_model,
+    weights_to_npz_bytes,
+    npz_bytes_to_weights,
+)
 from elephas.utils.rwlock import RWLock as Lock
 from elephas.utils.notebook_utils import is_running_in_notebook
 from elephas.utils import subtract_params
@@ -26,18 +29,17 @@ class BaseParameterServer(abc.ABC):
     def __init__(self, model: Model, port: int, mode: str, **kwargs):
         self.port = port
         self.mode = mode
-        self.master_network = dict_to_model(model, kwargs.get('custom_objects'))
+        self.master_network = dict_to_model(model, kwargs.get("custom_objects"))
         self.lock = Lock()
 
     @abc.abstractmethod
     def start(self):
-        """Start the parameter server instance.
-        """
+        """Start the parameter server instance."""
 
     @abc.abstractmethod
     def stop(self):
-        """Terminate the parameter server instance.
-        """
+        """Terminate the parameter server instance."""
+
     def make_read_threadsafe_if_necessary(self, func):
         return self.make_threadsafe_if_necessary(func, self.lock.acquire_read)
 
@@ -46,12 +48,14 @@ class BaseParameterServer(abc.ABC):
 
     def make_threadsafe_if_necessary(self, func, lock_aquire_callable):
         if self.mode == Mode.ASYNCHRONOUS:
+
             @wraps(func)
             def wrapper(*args, **kwargs):
                 lock_aquire_callable()
                 result = func(*args, **kwargs)
                 self.lock.release()
                 return result
+
             return wrapper
         else:
             return func
@@ -91,7 +95,6 @@ class HttpServer(BaseParameterServer):
             self.threaded = kwargs.get("threaded", True)
             self.use_reloader = kwargs.get("use_reloader", False)
 
-        self.pickled_weights = None
         self.weights = self.master_network.get_weights()
 
         self.server = Process(target=self.start_flask_service)
@@ -117,34 +120,35 @@ class HttpServer(BaseParameterServer):
         app = Flask(__name__)
         self.app = app
 
-        @app.route('/')
+        @app.route("/")
         def home():
-            return 'Elephas'
+            return "Elephas"
 
-        @app.route('/parameters', methods=['GET'])
+        @app.route("/parameters", methods=["GET"])
         @self.make_read_threadsafe_if_necessary
         def handle_get_parameters():
-            self.pickled_weights = pickle.dumps(self.weights, -1)
-            pickled_weights = self.pickled_weights
-            return pickled_weights
+            payload = weights_to_npz_bytes(self.weights)
+            return Response(payload, mimetype="application/octet-stream")
 
-        @app.route('/update', methods=['POST'])
+        @app.route("/update", methods=["POST"])
         @self.make_write_threadsafe_if_necessary
         def handle_update_parameters():
-            delta = pickle.loads(request.data)
-
+            delta = npz_bytes_to_weights(request.data)
             if not self.master_network.built:
                 self.master_network.build()
-
-            # Just apply the gradient
             weights_before = self.weights
             self.weights = subtract_params(weights_before, delta)
-            return 'Update done'
+            return "Update done"
 
         master_url = determine_master(self.port)
-        host = master_url.split(':')[0]
-        self.app.run(host=host, debug=self.debug, port=self.port,
-                     threaded=self.threaded, use_reloader=self.use_reloader)
+        host = master_url.split(":")[0]
+        self.app.run(
+            host=host,
+            debug=self.debug,
+            port=self.port,
+            threaded=self.threaded,
+            use_reloader=self.use_reloader,
+        )
 
 
 class SocketServer(BaseParameterServer):
@@ -168,8 +172,12 @@ class SocketServer(BaseParameterServer):
         self.connections = []
         self.lock = Lock()
         self.thread = None
-        self.update_parameters = self.make_write_threadsafe_if_necessary(self.update_parameters)
-        self.get_parameters = self.make_read_threadsafe_if_necessary(self.get_parameters)
+        self.update_parameters = self.make_write_threadsafe_if_necessary(
+            self.update_parameters
+        )
+        self.get_parameters = self.make_read_threadsafe_if_necessary(
+            self.get_parameters
+        )
 
     def start(self):
         if self.thread is not None:
@@ -185,8 +193,8 @@ class SocketServer(BaseParameterServer):
     def start_server(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-        master_url = determine_master(port=self.port).split(':')[0]
-        host = master_url.split(':')[0]
+        master_url = determine_master(port=self.port).split(":")[0]
+        host = master_url.split(":")[0]
         sock.bind((host, self.port))
         sock.listen(5)
         self.socket = sock
@@ -202,7 +210,7 @@ class SocketServer(BaseParameterServer):
             self.socket.close()
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             try:
-                host = determine_master(port=self.port).split(':')[0]
+                host = determine_master(port=self.port).split(":")[0]
                 sock.connect((host, self.port))
                 sock.close()
             except Exception:
@@ -211,22 +219,22 @@ class SocketServer(BaseParameterServer):
         self.connections = []
 
     def update_parameters(self, conn):
-        data = receive(conn)
-        delta = data['delta']
+        blob = recv_bytes(conn)
+        delta = npz_bytes_to_weights(blob)
         weights = self.master_network.get_weights()
-        # apply the gradient
         self.master_network.set_weights(subtract_params(weights, delta))
 
     def get_parameters(self, conn):
         weights = self.master_network.get_weights()
-        send(conn, weights)
+        blob = weights_to_npz_bytes(weights)
+        send_bytes(conn, blob)
 
     def action_listener(self, conn):
         while self.runs:
             get_or_update = conn.recv(1).decode()
-            if get_or_update == 'u':
+            if get_or_update == "u":
                 self.update_parameters(conn)
-            elif get_or_update == 'g':
+            elif get_or_update == "g":
                 self.get_parameters(conn)
 
     def run(self):
