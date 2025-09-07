@@ -7,9 +7,9 @@ authors = [
     { name = "Daniel Cahall", email = "danielenricocahall@gmail.com" }
 ]
 license = { text = "MIT" }
-requires-python = ">=3.9,<3.13"
+requires-python = ">=3.10,<3.14"
 dependencies = [
-    "tensorflow>2.2,<2.20",
+    "tensorflow>2.2,<2.21",
     "Flask==2.3.3",
     "h5py==3.11.0",
     "pyspark<=4.0.0",
