@@ -11,7 +11,6 @@ requires-python = ">=3.10,<3.14"
 dependencies = [
     "tensorflow>2.2,<2.21",
     "Flask<4.0",
-    "h5py==3.11.0",
     "pyspark<5.0",
     "Cython==0.29.33",
 ]
