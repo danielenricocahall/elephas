@@ -332,23 +332,6 @@ toml = [
 ]
 
 [[package]]
-name = "cython"
-version = "0.29.33"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/dc/f6/e8e302f9942cbebede88b1a0c33d0be3a738c3ac37abae87254d58ffc51c/Cython-0.29.33.tar.gz", hash = "sha256:5040764c4a4d2ce964a395da24f0d1ae58144995dab92c6b96f44c3f4d72286a", size = 2093693 }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/be/f9/198c7b9d125b29bcedaf923f5f2c29bd4b4534d4a8dd2ee5780244337af4/Cython-0.29.33-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.manylinux_2_24_aarch64.whl", hash = "sha256:190e60b7505d3b9b60130bcc2251c01b9ef52603420829c19d3c3ede4ac2763a", size = 1818634 },
-    { url = "https://files.pythonhosted.org/packages/21/76/ef852189cc39a33cedc08d30189de2d1e44d826ddcf101e24c82c8b8ea0c/Cython-0.29.33-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.manylinux_2_24_x86_64.whl", hash = "sha256:0168482495b75fea1c97a9641a95bac991f313e85f378003f9a4909fdeb3d454", size = 1922897 },
-    { url = "https://files.pythonhosted.org/packages/67/15/3b22fd051b32551a668c8bc1cd48e60c88d6716cfdbab902a9e5d8bd2f09/Cython-0.29.33-cp310-cp310-manylinux_2_5_i686.manylinux1_i686.manylinux_2_24_i686.whl", hash = "sha256:090556e41f2b30427dd3a1628d3613177083f47567a30148b6b7b8c7a5862187", size = 1922746 },
-    { url = "https://files.pythonhosted.org/packages/73/a3/e91ae5a3085f23409193141bb0add2fb1afc9bc416553406990290a0f755/Cython-0.29.33-cp310-cp310-musllinux_1_1_x86_64.whl", hash = "sha256:19c9913e9304bf97f1d2c357438895466f99aa2707d3c7a5e9de60c259e1ca1d", size = 2018690 },
-    { url = "https://files.pythonhosted.org/packages/6b/e0/af071dfca654fb8d03cd43a1aa3081838a7032d7cb335631c7ea7d181843/Cython-0.29.33-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.manylinux_2_24_aarch64.whl", hash = "sha256:afc9b6ab20889676c76e700ae6967aa6886a7efe5b05ef6d5b744a6ca793cc43", size = 1817669 },
-    { url = "https://files.pythonhosted.org/packages/1f/a7/0e28ae6605a3b79724eb0df6e48fd3a654e2bf059e5aacb5074b92258948/Cython-0.29.33-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.manylinux_2_24_x86_64.whl", hash = "sha256:49fb45b2bf12d6e2060bbd64506c06ac90e254f3a4bceb32c717f4964a1ae812", size = 1920883 },
-    { url = "https://files.pythonhosted.org/packages/29/54/8f79c74924a0516ae71c7808ab115189c8c62fedc14987b636f03cc4ac83/Cython-0.29.33-cp311-cp311-manylinux_2_5_i686.manylinux1_i686.manylinux_2_24_i686.whl", hash = "sha256:5430f38d3d01c4715ec2aef5c41e02a2441c1c3a0149359c7a498e4c605b8e6c", size = 1920270 },
-    { url = "https://files.pythonhosted.org/packages/e9/b5/5022f5ca77fc844b884de314da6284b03baaa6f1c9005d3d4f8d756311b1/Cython-0.29.33-cp311-cp311-musllinux_1_1_x86_64.whl", hash = "sha256:c4d315443c7f4c61180b6c3ea9a9717ee7c901cc9db8d1d46fdf6556613840ed", size = 2018211 },
-    { url = "https://files.pythonhosted.org/packages/56/3a/e59db3769dee48409c759a88b62cd605324e05d396e10af0a065adc956ad/Cython-0.29.33-py2.py3-none-any.whl", hash = "sha256:8b99252bde8ff51cd06a3fe4aeacd3af9b4ff4a4e6b701ac71bddc54f5da61d6", size = 987330 },
-]
-
-[[package]]
 name = "datasets"
 version = "4.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -397,7 +380,6 @@ name = "elephas"
 version = "7.2.0"
 source = { editable = "." }
 dependencies = [
-    { name = "cython" },
     { name = "flask" },
     { name = "pyspark" },
     { name = "tensorflow", version = "2.19.1", source = { registry = "https://pypi.org/simple" }, marker = "platform_machine == 'arm64' and sys_platform == 'darwin'" },
@@ -418,7 +400,6 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "cython", specifier = "==0.29.33" },
     { name = "flask", specifier = "<4.0" },
     { name = "pyspark", specifier = "<5.0" },
     { name = "tensorflow", marker = "platform_machine == 'arm64' and sys_platform == 'darwin'", specifier = ">2.2,<2.20" },
@@ -442,7 +423,7 @@ name = "exceptiongroup"
 version = "1.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions", marker = "python_full_version < '3.13'" },
+    { name = "typing-extensions", marker = "python_full_version < '3.11'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/0b/9f/a65090624ecf468cdca03533906e7c69ed7588582240cfe7cc9e770b50eb/exceptiongroup-1.3.0.tar.gz", hash = "sha256:b241f5885f560bc56a59ee63ca4c6a8bfa46ae4ad651af316d4e81817bb9fd88", size = 29749 }
 wheels = [
