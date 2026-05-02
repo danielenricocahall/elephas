@@ -13,7 +13,8 @@ dependencies = [
     # note: noticed Tensorflow and MacOS arm64 support is still a bit spotty with the newest versions
     "tensorflow>2.2,<2.20; platform_system == 'Darwin' and platform_machine == 'arm64'",
     "Flask<4.0",
-    "pyspark<5.0"
+    "pyspark<5.0",
+    "beautifulsoup4>=4.14.2",
 ]
 
 
