@@ -1,4 +1,6 @@
+import socket
 import struct
+import time
 from socket import gethostbyname, gethostname
 import os
 
@@ -48,19 +50,43 @@ def send_bytes(sock, b: bytes):
 
 
 def recv_bytes(sock) -> bytes:
-    import socket as _s
-
     hdr = b""
     while len(hdr) < 4:
         chunk = sock.recv(4 - len(hdr))
         if not chunk:
-            raise _s.error("socket closed")
+            raise socket.error("socket closed")
         hdr += chunk
     (n,) = struct.unpack("!I", hdr)
     buf = bytearray()
     while len(buf) < n:
         chunk = sock.recv(n - len(buf))
         if not chunk:
-            raise _s.error("socket closed during payload")
+            raise socket.error("socket closed during payload")
         buf.extend(chunk)
     return bytes(buf)
+
+
+def wait_until_listening(host: str, port: int, timeout: float = 30.0) -> None:
+    """Block until a TCP listener accepts on (host, port), or raise TimeoutError.
+
+    Used by parameter-server ``start()`` methods to close the gap between
+    spawning the server (subprocess or thread) and the OS actually performing
+    bind+listen. Without this, the first client request can race ahead and
+    fail with ConnectionRefused. The timeout also surfaces server-startup
+    failures (e.g. bind in TIME_WAIT) that would otherwise hang silently.
+    """
+    deadline = time.monotonic() + timeout
+    last_err: Exception = OSError("no connect attempt was made")
+    while time.monotonic() < deadline:
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(0.5)
+                s.connect((host, port))
+                return
+        except (ConnectionRefusedError, OSError) as e:
+            last_err = e
+            time.sleep(0.05)
+    raise TimeoutError(
+        f"Server at {host}:{port} did not start listening within {timeout}s "
+        f"(last error: {last_err!r})"
+    )
