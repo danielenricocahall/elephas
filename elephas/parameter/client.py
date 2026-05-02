@@ -5,7 +5,7 @@ import socket
 
 import urllib.request as urllib2
 
-from ..utils import npz_bytes_to_weights, weights_to_npz_bytes
+from ..utils import bytes_to_weights, weights_to_bytes
 from ..utils.sockets import determine_master, recv_bytes, send_bytes
 
 
@@ -58,10 +58,10 @@ class HttpClient(BaseParameterClient):
             f"http://{self.master_url}/parameters", headers=self.headers
         )
         blob = urllib2.urlopen(request).read()
-        return npz_bytes_to_weights(blob)
+        return bytes_to_weights(blob)
 
     def update_parameters(self, delta: list):
-        blob = weights_to_npz_bytes(delta)
+        blob = weights_to_bytes(delta)
         request = urllib2.Request(
             f"http://{self.master_url}/update", data=blob, headers=self.headers
         )
@@ -86,12 +86,12 @@ class SocketClient(BaseParameterClient):
             sock.connect((host, self.port))
             sock.sendall(b"g")
             blob = recv_bytes(sock)
-        return npz_bytes_to_weights(blob)
+        return bytes_to_weights(blob)
 
     def update_parameters(self, delta: list):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             host = determine_master(port=self.port).split(":")[0]
             sock.connect((host, self.port))
             sock.sendall(b"u")
-            blob = weights_to_npz_bytes(delta)
+            blob = weights_to_bytes(delta)
             send_bytes(sock, blob)

@@ -11,8 +11,8 @@ from elephas.utils.sockets import determine_master
 from elephas.utils.sockets import recv_bytes, send_bytes
 from elephas.utils.serialization import (
     dict_to_model,
-    weights_to_npz_bytes,
-    npz_bytes_to_weights,
+    weights_to_bytes,
+    bytes_to_weights,
 )
 from elephas.utils.rwlock import RWLock as Lock
 from elephas.utils.notebook_utils import is_running_in_notebook
@@ -127,13 +127,13 @@ class HttpServer(BaseParameterServer):
         @app.route("/parameters", methods=["GET"])
         @self.make_read_threadsafe_if_necessary
         def handle_get_parameters():
-            payload = weights_to_npz_bytes(self.weights)
+            payload = weights_to_bytes(self.weights)
             return Response(payload, mimetype="application/octet-stream")
 
         @app.route("/update", methods=["POST"])
         @self.make_write_threadsafe_if_necessary
         def handle_update_parameters():
-            delta = npz_bytes_to_weights(request.data)
+            delta = bytes_to_weights(request.data)
             if not self.master_network.built:
                 self.master_network.build()
             weights_before = self.weights
@@ -220,13 +220,13 @@ class SocketServer(BaseParameterServer):
 
     def update_parameters(self, conn):
         blob = recv_bytes(conn)
-        delta = npz_bytes_to_weights(blob)
+        delta = bytes_to_weights(blob)
         weights = self.master_network.get_weights()
         self.master_network.set_weights(subtract_params(weights, delta))
 
     def get_parameters(self, conn):
         weights = self.master_network.get_weights()
-        blob = weights_to_npz_bytes(weights)
+        blob = weights_to_bytes(weights)
         send_bytes(conn, blob)
 
     def action_listener(self, conn):
