@@ -7,7 +7,7 @@ from multiprocessing import Process
 from tensorflow.keras.models import Model
 
 from elephas.enums.modes import Mode
-from elephas.utils.sockets import determine_master
+from elephas.utils.sockets import determine_master, wait_until_listening
 from elephas.utils.sockets import recv_bytes, send_bytes
 from elephas.utils.serialization import (
     dict_to_model,
@@ -102,6 +102,8 @@ class HttpServer(BaseParameterServer):
     def start(self):
         self.server.start()
         self.master_url = determine_master(self.port)
+        host = self.master_url.split(":")[0]
+        wait_until_listening(host, self.port)
 
     def stop(self):
         self.server.terminate()
@@ -184,6 +186,8 @@ class SocketServer(BaseParameterServer):
             self.stop()
         self.thread = Thread(target=self.start_server)
         self.thread.start()
+        host = determine_master(port=self.port).split(":")[0]
+        wait_until_listening(host, self.port)
 
     def stop(self):
         self.stop_server()
@@ -192,6 +196,11 @@ class SocketServer(BaseParameterServer):
 
     def start_server(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # Allow rebinding when a prior test/run left the port in TIME_WAIT,
+        # otherwise back-to-back tests on the same port hit
+        # OSError(EADDRINUSE) and the parent thread eventually times out
+        # waiting on connect with a confusing ConnectionRefused.
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         master_url = determine_master(port=self.port).split(":")[0]
         host = master_url.split(":")[0]
