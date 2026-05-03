@@ -7,12 +7,12 @@ from multiprocessing import Process
 from tensorflow.keras.models import Model
 
 from elephas.enums.modes import Mode
-from elephas.utils.sockets import determine_master
+from elephas.utils.sockets import determine_master, wait_until_listening
 from elephas.utils.sockets import recv_bytes, send_bytes
 from elephas.utils.serialization import (
     dict_to_model,
-    weights_to_npz_bytes,
-    npz_bytes_to_weights,
+    weights_to_bytes,
+    bytes_to_weights,
 )
 from elephas.utils.rwlock import RWLock as Lock
 from elephas.utils.notebook_utils import is_running_in_notebook
@@ -102,6 +102,8 @@ class HttpServer(BaseParameterServer):
     def start(self):
         self.server.start()
         self.master_url = determine_master(self.port)
+        host = self.master_url.split(":")[0]
+        wait_until_listening(host, self.port)
 
     def stop(self):
         self.server.terminate()
@@ -127,13 +129,13 @@ class HttpServer(BaseParameterServer):
         @app.route("/parameters", methods=["GET"])
         @self.make_read_threadsafe_if_necessary
         def handle_get_parameters():
-            payload = weights_to_npz_bytes(self.weights)
+            payload = weights_to_bytes(self.weights)
             return Response(payload, mimetype="application/octet-stream")
 
         @app.route("/update", methods=["POST"])
         @self.make_write_threadsafe_if_necessary
         def handle_update_parameters():
-            delta = npz_bytes_to_weights(request.data)
+            delta = bytes_to_weights(request.data)
             if not self.master_network.built:
                 self.master_network.build()
             weights_before = self.weights
@@ -184,6 +186,8 @@ class SocketServer(BaseParameterServer):
             self.stop()
         self.thread = Thread(target=self.start_server)
         self.thread.start()
+        host = determine_master(port=self.port).split(":")[0]
+        wait_until_listening(host, self.port)
 
     def stop(self):
         self.stop_server()
@@ -192,6 +196,11 @@ class SocketServer(BaseParameterServer):
 
     def start_server(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # Allow rebinding when a prior test/run left the port in TIME_WAIT,
+        # otherwise back-to-back tests on the same port hit
+        # OSError(EADDRINUSE) and the parent thread eventually times out
+        # waiting on connect with a confusing ConnectionRefused.
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         master_url = determine_master(port=self.port).split(":")[0]
         host = master_url.split(":")[0]
@@ -220,13 +229,13 @@ class SocketServer(BaseParameterServer):
 
     def update_parameters(self, conn):
         blob = recv_bytes(conn)
-        delta = npz_bytes_to_weights(blob)
+        delta = bytes_to_weights(blob)
         weights = self.master_network.get_weights()
         self.master_network.set_weights(subtract_params(weights, delta))
 
     def get_parameters(self, conn):
         weights = self.master_network.get_weights()
-        blob = weights_to_npz_bytes(weights)
+        blob = weights_to_bytes(weights)
         send_bytes(conn, blob)
 
     def action_listener(self, conn):
