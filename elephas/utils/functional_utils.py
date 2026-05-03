@@ -45,3 +45,25 @@ def divide_by(array_list: List[np.array], num_workers: int) -> List[np.array]:
     :return:
     """
     return [x / num_workers for x in array_list]
+
+
+def average_and_subtract(
+    base: List[np.array], deltas: List[List[np.array]]
+) -> List[np.array]:
+    """Return ``[base[i] - mean(d[i] for d in deltas)]`` elementwise.
+
+    Equivalent to repeatedly applying ``subtract_params(base, divide_by(d, N))``
+    once per delta, but with a single accumulator and one final scaled subtract.
+    Saves ``2N`` model-sized allocations on the driver, which dominates the
+    per-epoch aggregation cost for large models / many workers.
+    """
+    n = len(deltas)
+    if n == 0:
+        return [np.array(b, copy=True) for b in base]
+    deltas_iter = iter(deltas)
+    total = [d.copy() for d in next(deltas_iter)]
+    for delta in deltas_iter:
+        for t, d in zip(total, delta):
+            t += d
+    inv_n = 1.0 / n
+    return [b - t * inv_n for b, t in zip(base, total)]
