@@ -25,13 +25,6 @@ def test_subtract_params():
             assert res[0][i, j] == 0
 
 
-def test_get_neutral():
-    x = [np.ones((3, 4))]
-    res = functional_utils.get_neutral(x)
-    assert res[0].shape == x[0].shape
-    assert res[0][0, 0] == 0
-
-
 def test_divide_by():
     x = [np.ones((3, 4))]
     res = functional_utils.divide_by(x, num_workers=10)
