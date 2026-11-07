@@ -27,16 +27,6 @@ def subtract_params(
     return [x - y for x, y in zip(param_list_left, param_list_right)]
 
 
-def get_neutral(array_list: List[np.array]) -> List[np.array]:
-    """Get list of zero-valued numpy arrays for
-    specified list of numpy arrays
-
-    :param array_list: list of numpy arrays
-    :return: list of zeros of same shape as input
-    """
-    return [np.zeros_like(x) for x in array_list]
-
-
 def divide_by(array_list: List[np.array], num_workers: int) -> List[np.array]:
     """Divide a list of parameters by an integer num_workers.
 
