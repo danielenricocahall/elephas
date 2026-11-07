@@ -57,3 +57,6 @@ exclude = [
     "README.md",
     "CONTRIBUTING.md"
 ]
+
+[tool.ruff.lint]
+extend-ignore = ["F405", "F403"]
